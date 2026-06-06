@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#f4f1dc"/>
+  <path d="M0 44h64v20H0z" fill="#162234"/>
+  <path d="M0 35c9-11 18-11 27 0 8 10 18 10 32-2l5 8v23H0z" fill="#2e425d"/>
+  <text x="32" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#111820">DPC</text>
+</svg>
