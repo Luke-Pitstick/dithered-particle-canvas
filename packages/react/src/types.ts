@@ -12,9 +12,17 @@ export type DitherConfig = {
 export type BuiltInFilterConfig =
   | { type: "brightness"; amount: number }
   | { type: "contrast"; amount: number }
+  | { type: "paletteQuantize"; colors: string[]; amount?: number }
   | { type: "posterize"; levels: number }
   | { type: "tint"; color: string; amount: number }
   | { type: "opacity"; amount: number };
+
+export type RevealTrailConfig = {
+  durationMs?: number;
+  maxPoints?: number;
+  spacing?: number;
+  strength?: number;
+};
 
 export type RevealInteractionConfig = {
   mode?: "reveal";
@@ -23,6 +31,7 @@ export type RevealInteractionConfig = {
   softness?: number;
   edgeDither?: number;
   fadeMs?: number;
+  trail?: boolean | RevealTrailConfig;
 };
 
 export type DitheredLayer = {

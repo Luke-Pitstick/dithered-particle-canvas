@@ -427,7 +427,11 @@ class ReactCanvasRenderer implements DitheredCanvasRenderer {
       event,
       rect,
       this.#size,
-      this.#now()
+      this.#now(),
+      {
+        reducedMotion: this.#motionReduced,
+        reveal: this.#getRevealConfig()
+      }
     );
 
     this.#backend.setPointer(pointer);
@@ -435,7 +439,10 @@ class ReactCanvasRenderer implements DitheredCanvasRenderer {
   };
 
   #handlePointerLeave = (): void => {
-    const pointer = this.#pointerStore.leave(this.#now());
+    const pointer = this.#pointerStore.leave(this.#now(), {
+      reducedMotion: this.#motionReduced,
+      reveal: this.#getRevealConfig()
+    });
 
     this.#backend.setPointer(pointer);
     this.#markRenderDirty("pointer");

@@ -9,6 +9,7 @@ import {
   type RenderFrame,
   type RenderSize
 } from "../../renderer/types";
+import { resolveRevealTrailConfig } from "../../interaction/reveal-mask";
 import { createImageData } from "../../utils/image-data";
 import { createFramebufferForTexture, deleteFramebuffer, type ManagedFramebuffer } from "./framebuffers";
 import { preprocessLayerToImageData } from "./preprocess";
@@ -38,6 +39,7 @@ const FULLSCREEN_TRIANGLE_STRIP = new Float32Array([
   -1, 1,
   1, 1
 ]);
+const MAX_REVEAL_TRAIL_POINTS = 32;
 
 export type WebGL2BackendDebugCounters = {
   compositePasses: number;
@@ -279,7 +281,10 @@ export class WebGL2Backend implements RenderBackend {
           "u_radius",
           "u_revealLayer",
           "u_softness",
-          "u_strength"
+          "u_strength",
+          "u_trailCount",
+          "u_trailPoints",
+          "u_trailStrength"
         ],
         vertexLabel: "fullscreen-vertex",
         vertexSource: FULLSCREEN_VERTEX_SHADER
@@ -400,6 +405,8 @@ export class WebGL2Backend implements RenderBackend {
     const revealLayer = frame.revealLayer ?? "background";
     const revealOwner = revealLayer === "background" ? this.#layers.foreground : this.#layers.background;
     const reveal = { ...DEFAULT_REVEAL, ...(revealOwner?.reveal || {}) };
+    const trail = resolveRevealTrailConfig(reveal.trail);
+    const trailPoints = (this.#pointer.trail ?? []).slice(0, MAX_REVEAL_TRAIL_POINTS);
     const pointerActive =
       Boolean(revealOwner?.reveal) &&
       (this.#pointer.active || (this.#pointer.fade ?? 0) > 0);
@@ -412,6 +419,23 @@ export class WebGL2Backend implements RenderBackend {
     gl.uniform1f(program.uniforms.u_strength, reveal.strength);
     gl.uniform1f(program.uniforms.u_edgeDither, reveal.edgeDither);
     gl.uniform1i(program.uniforms.u_revealLayer, revealLayer === "background" ? 0 : 1);
+    gl.uniform1i(program.uniforms.u_trailCount, trail ? trailPoints.length : 0);
+    gl.uniform1f(program.uniforms.u_trailStrength, trail ? trail.strength : 0);
+
+    if (trail && trailPoints.length > 0) {
+      const data = new Float32Array(MAX_REVEAL_TRAIL_POINTS * 4);
+
+      for (let index = 0; index < trailPoints.length; index += 1) {
+        const point = trailPoints[index]!;
+        const offset = index * 4;
+        data[offset] = point.x;
+        data[offset + 1] = this.#size.height - point.y;
+        data[offset + 2] = point.fade;
+        data[offset + 3] = 0;
+      }
+
+      gl.uniform4fv(program.uniforms.u_trailPoints, data);
+    }
   }
 
   #bindTexture(unit: number, texture: WebGLTexture): void {

@@ -3,6 +3,7 @@ import type { PointerSnapshot } from "../renderer/types";
 import {
   BROWSERBASE_REVEAL_PRESET,
   getDitherThreshold,
+  getRevealCompositeMaskAlpha,
   getRevealFade,
   getRevealMaskAlpha
 } from "./reveal-mask";
@@ -77,6 +78,41 @@ describe("reveal mask", () => {
         y: 10
       })
     ).toBe(0.25);
+  });
+
+  it("turns aged trail points into dithered dust coverage", () => {
+    const reveal = {
+      ...BROWSERBASE_REVEAL_PRESET,
+      edgeDither: 0,
+      radius: 10,
+      trail: {
+        durationMs: 900,
+        strength: 0.5
+      }
+    };
+
+    expect(
+      getRevealCompositeMaskAlpha({
+        pointer: {
+          ...ACTIVE_POINTER,
+          trail: [{ fade: 0.5, x: 30, y: 30 }]
+        },
+        reveal,
+        x: 30,
+        y: 30
+      })
+    ).toBe(0.5);
+    expect(
+      getRevealCompositeMaskAlpha({
+        pointer: {
+          ...ACTIVE_POINTER,
+          trail: [{ fade: 0.5, x: 30, y: 30 }]
+        },
+        reveal,
+        x: 32,
+        y: 29
+      })
+    ).toBe(0);
   });
 
   it("fades out after pointer leave and clears immediately for reduced motion", () => {

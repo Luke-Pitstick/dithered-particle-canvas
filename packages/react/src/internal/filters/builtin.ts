@@ -1,5 +1,5 @@
 import type { BuiltInFilterConfig } from "../../types";
-import { clamp01, mixColors, parseColor, toByte } from "../utils/color";
+import { clamp01, findNearestPaletteColor, mixColors, parseColor, toByte } from "../utils/color";
 import { cloneImageData, createImageData, type ImageDataLike } from "../utils/image-data";
 
 const FILTER_ORDER: BuiltInFilterConfig["type"][] = [
@@ -7,6 +7,7 @@ const FILTER_ORDER: BuiltInFilterConfig["type"][] = [
   "contrast",
   "posterize",
   "tint",
+  "paletteQuantize",
   "opacity"
 ];
 
@@ -88,6 +89,41 @@ function applyFilterInPlace(imageData: ImageDataLike, filter: BuiltInFilterConfi
             r: imageData.data[index] ?? 0
           },
           tint,
+          amount
+        );
+
+        imageData.data[index] = toByte(mixed.r);
+        imageData.data[index + 1] = toByte(mixed.g);
+        imageData.data[index + 2] = toByte(mixed.b);
+      }
+
+      return;
+    }
+    case "paletteQuantize": {
+      if (filter.colors.length === 0) {
+        throw new Error("paletteQuantize requires at least one color.");
+      }
+
+      const palette = filter.colors.map(parseColor).map((color) => ({ ...color, a: 255 }));
+      const amount = clamp01(filter.amount ?? 1);
+
+      for (let index = 0; index < imageData.data.length; index += 4) {
+        const alpha = imageData.data[index + 3] ?? 0;
+
+        if (alpha === 0) {
+          continue;
+        }
+
+        const source = {
+          a: 255,
+          b: imageData.data[index + 2] ?? 0,
+          g: imageData.data[index + 1] ?? 0,
+          r: imageData.data[index] ?? 0
+        };
+        const nearest = findNearestPaletteColor(source, palette);
+        const mixed = mixColors(
+          { ...source, a: alpha },
+          { ...nearest, a: alpha },
           amount
         );
 

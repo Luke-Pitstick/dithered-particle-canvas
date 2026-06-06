@@ -28,6 +28,12 @@ describe("built-in CPU filters", () => {
       100,
       200
     ]);
+    expect(
+      applyFilterToPixel([230, 120, 20, 200], {
+        type: "paletteQuantize",
+        colors: ["#000000", "#ff3a12", "#ffe100"]
+      })
+    ).toEqual([255, 58, 18, 200]);
     expect(applyFilterToPixel([100, 120, 140, 200], { type: "opacity", amount: 0.25 })).toEqual([
       100,
       120,
@@ -44,12 +50,13 @@ describe("built-in CPU filters", () => {
     );
     const output = applyBuiltInFilters(imageData, [
       { type: "opacity", amount: 0.5 },
+      { type: "paletteQuantize", colors: ["#000000", "#ffffff"] },
       { type: "tint", color: "#0000ff", amount: 0.5 },
       { type: "posterize", levels: 2 },
       { type: "contrast", amount: 2 },
       { type: "brightness", amount: 2 }
     ]);
 
-    expect([...output.data]).toEqual([128, 128, 255, 100]);
+    expect([...output.data]).toEqual([255, 255, 255, 100]);
   });
 });

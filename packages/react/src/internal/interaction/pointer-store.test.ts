@@ -46,4 +46,50 @@ describe("pointer store", () => {
     expect(store.getSnapshot({ now: 11, reducedMotion: true }).fade).toBe(0);
     expect(store.isFadeActive({ now: 11, reducedMotion: true })).toBe(false);
   });
+
+  it("keeps a bounded reveal trail that fades over time", () => {
+    const store = new RevealPointerStore();
+    const reveal = {
+      trail: {
+        durationMs: 100,
+        maxPoints: 2,
+        spacing: 10
+      }
+    };
+
+    store.move(
+      { clientX: 10, clientY: 10 },
+      { height: 100, left: 0, top: 0, width: 100 },
+      { height: 100, width: 100 },
+      0,
+      { reveal }
+    );
+    store.move(
+      { clientX: 12, clientY: 12 },
+      { height: 100, left: 0, top: 0, width: 100 },
+      { height: 100, width: 100 },
+      20,
+      { reveal }
+    );
+    store.move(
+      { clientX: 30, clientY: 10 },
+      { height: 100, left: 0, top: 0, width: 100 },
+      { height: 100, width: 100 },
+      40,
+      { reveal }
+    );
+
+    expect(store.getSnapshot({ now: 50, reveal }).trail).toEqual([
+      { fade: 0.5, x: 10, y: 10 },
+      { fade: 0.9, x: 30, y: 10 }
+    ]);
+    const remainingTrail = store.getSnapshot({ now: 101, reveal }).trail ?? [];
+
+    expect(remainingTrail).toHaveLength(1);
+    expect(remainingTrail[0]?.x).toBe(30);
+    expect(remainingTrail[0]?.y).toBe(10);
+    expect(remainingTrail[0]?.fade).toBeCloseTo(0.39);
+    expect(store.isFadeActive({ now: 101, reveal })).toBe(true);
+    expect(store.isFadeActive({ now: 200, reveal })).toBe(false);
+  });
 });

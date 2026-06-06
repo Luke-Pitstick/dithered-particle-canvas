@@ -23,6 +23,8 @@ void main() {
 export const REVEAL_COMPOSITE_FRAGMENT_SHADER = `#version 300 es
 precision mediump float;
 
+const int MAX_TRAIL_POINTS = 32;
+
 uniform sampler2D u_background;
 uniform sampler2D u_foreground;
 uniform vec2 u_pointer;
@@ -33,6 +35,9 @@ uniform float u_softness;
 uniform float u_strength;
 uniform float u_edgeDither;
 uniform int u_revealLayer;
+uniform int u_trailCount;
+uniform vec4 u_trailPoints[MAX_TRAIL_POINTS];
+uniform float u_trailStrength;
 
 in vec2 v_uv;
 out vec4 outColor;
@@ -62,18 +67,8 @@ vec4 sourceOver(vec4 destination, vec4 source) {
   return vec4(rgb, alpha);
 }
 
-void main() {
-  vec4 background = texture(u_background, v_uv);
-  vec4 foreground = texture(u_foreground, v_uv);
-  vec4 base = sourceOver(background, foreground);
-
-  if (u_pointerActive < 0.5 || u_radius <= 0.0) {
-    outColor = base;
-    return;
-  }
-
-  vec2 pixel = gl_FragCoord.xy;
-  float distanceToPointer = distance(pixel, u_pointer);
+float revealMask(vec2 pixel, vec2 point, float fade) {
+  float distanceToPointer = distance(pixel, point);
   float softStart = u_radius * (1.0 - clamp(u_softness, 0.0, 1.0));
   float mask = 0.0;
 
@@ -88,7 +83,37 @@ void main() {
     mask = bayer4(pixel) < edgeAmount * clamp(u_edgeDither, 0.0, 1.0) ? 0.0 : mask;
   }
 
-  mask *= clamp(u_strength, 0.0, 1.0) * clamp(u_pointerFade, 0.0, 1.0);
+  return mask * clamp(u_strength, 0.0, 1.0) * clamp(fade, 0.0, 1.0);
+}
+
+void main() {
+  vec4 background = texture(u_background, v_uv);
+  vec4 foreground = texture(u_foreground, v_uv);
+  vec4 base = sourceOver(background, foreground);
+
+  if ((u_pointerActive < 0.5 && u_trailCount == 0) || u_radius <= 0.0) {
+    outColor = base;
+    return;
+  }
+
+  vec2 pixel = gl_FragCoord.xy;
+  float mask = 0.0;
+
+  if (u_pointerActive >= 0.5) {
+    mask = revealMask(pixel, u_pointer, u_pointerFade);
+  }
+
+  for (int i = 0; i < MAX_TRAIL_POINTS; i += 1) {
+    if (i >= u_trailCount) {
+      break;
+    }
+
+    vec4 point = u_trailPoints[i];
+
+    if (bayer4(pixel) <= clamp(point.z, 0.0, 1.0)) {
+      mask = max(mask, revealMask(pixel, point.xy, u_trailStrength));
+    }
+  }
 
   vec4 revealSource = u_revealLayer == 0 ? background : foreground;
   outColor = mix(base, revealSource, mask);

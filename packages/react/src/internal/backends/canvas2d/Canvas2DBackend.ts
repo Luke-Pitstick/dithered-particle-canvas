@@ -2,7 +2,7 @@ import {
   applyOpacityFilters,
   applyPreDitherFilters
 } from "../../filters/builtin";
-import { getRevealMaskAlpha } from "../../interaction/reveal-mask";
+import { getRevealCompositeMaskAlpha } from "../../interaction/reveal-mask";
 import {
   type LayerRole,
   type NormalizedLayer,
@@ -283,7 +283,7 @@ function mixReveal({
 
   for (let y = 0; y < output.height; y += 1) {
     for (let x = 0; x < output.width; x += 1) {
-      const mask = getRevealMaskAlpha({ pointer, reveal, x, y });
+      const mask = getRevealCompositeMaskAlpha({ pointer, reveal, x, y });
 
       if (mask === 0) {
         continue;

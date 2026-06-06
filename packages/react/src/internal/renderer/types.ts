@@ -20,6 +20,13 @@ export type PointerSnapshot = {
   active: boolean;
   pressure?: number;
   fade?: number;
+  trail?: RevealTrailPoint[];
+};
+
+export type RevealTrailPoint = {
+  fade: number;
+  x: number;
+  y: number;
 };
 
 export type RenderFrame = {
@@ -122,5 +129,6 @@ export const DEFAULT_REVEAL: Required<RevealInteractionConfig> = {
   mode: "reveal",
   radius: 150,
   softness: 0.35,
-  strength: 1
+  strength: 1,
+  trail: false
 };

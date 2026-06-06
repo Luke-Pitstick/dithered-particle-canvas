@@ -100,12 +100,24 @@ type DitherConfig = {
 type BuiltInFilterConfig =
   | { type: "brightness"; amount: number }
   | { type: "contrast"; amount: number }
+  | { type: "paletteQuantize"; colors: string[]; amount?: number }
   | { type: "posterize"; levels: number }
   | { type: "tint"; color: string; amount: number }
   | { type: "opacity"; amount: number };
 ```
 
 V1 supports only this built-in set. There is no public custom filter plugin API yet.
+
+Use `paletteQuantize` when a layer should collapse to a small art-directed palette, such as the Browserbase-style 3-5 color mountain foreground:
+
+```ts
+filters: [
+  {
+    type: "paletteQuantize",
+    colors: ["#080c0e", "#ff3a12", "#ffda18", "#77cb2d", "#f2efd6"]
+  }
+]
+```
 
 ## Quality
 
@@ -153,10 +165,18 @@ type RevealInteractionConfig = {
   softness?: number;
   edgeDither?: number;
   fadeMs?: number;
+  trail?: boolean | {
+    durationMs?: number;
+    maxPoints?: number;
+    spacing?: number;
+    strength?: number;
+  };
 };
 ```
 
 Defaults are tuned for a soft reveal with a dithered, broken-up edge. `radius` controls the reveal size, `strength` controls blend intensity, `softness` controls falloff, `edgeDither` controls the fragmented edge, and `fadeMs` controls how long the reveal takes to disappear after pointer leave.
+
+Set `trail` to leave a bounded afterimage behind pointer movement. `durationMs` controls how long each stamp remains, `maxPoints` caps the work per frame, `spacing` avoids oversampling tiny pointer moves, and `strength` controls how intense old stamps are.
 
 ## Callbacks
 

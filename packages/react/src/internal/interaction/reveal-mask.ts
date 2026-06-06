@@ -1,9 +1,16 @@
-import type { RevealInteractionConfig } from "../../types";
+import type { RevealInteractionConfig, RevealTrailConfig } from "../../types";
 import type { PointerSnapshot } from "../renderer/types";
 import { DEFAULT_REVEAL } from "../renderer/types";
 import { clamp01 } from "../utils/color";
 
 export const BROWSERBASE_REVEAL_PRESET = DEFAULT_REVEAL;
+
+export const DEFAULT_REVEAL_TRAIL: Required<RevealTrailConfig> = {
+  durationMs: 900,
+  maxPoints: 24,
+  spacing: 18,
+  strength: 0.72
+};
 
 export const REVEAL_DITHER_MATRIX = [
   [0, 8, 2, 10],
@@ -13,6 +20,7 @@ export const REVEAL_DITHER_MATRIX = [
 ] as const;
 
 export type ResolvedRevealConfig = Required<RevealInteractionConfig>;
+export type ResolvedRevealTrailConfig = Required<RevealTrailConfig>;
 
 export type RevealMaskSample = {
   x: number;
@@ -34,6 +42,23 @@ export function resolveRevealConfig(
   return {
     ...BROWSERBASE_REVEAL_PRESET,
     ...(reveal || {})
+  };
+}
+
+export function resolveRevealTrailConfig(
+  trail: RevealInteractionConfig["trail"]
+): ResolvedRevealTrailConfig | false {
+  if (!trail) {
+    return false;
+  }
+
+  if (trail === true) {
+    return DEFAULT_REVEAL_TRAIL;
+  }
+
+  return {
+    ...DEFAULT_REVEAL_TRAIL,
+    ...trail
   };
 }
 
@@ -100,6 +125,41 @@ export function getRevealMaskAlpha({
   }
 
   return clamp01(radialAlpha * clamp01(config.strength) * clamp01(pointer.fade ?? 1));
+}
+
+export function getRevealCompositeMaskAlpha(sample: RevealMaskSample): number {
+  const baseAlpha = getRevealMaskAlpha(sample);
+  const config = resolveRevealConfig(sample.reveal);
+  const trailConfig = resolveRevealTrailConfig(config.trail);
+
+  if (!trailConfig) {
+    return baseAlpha;
+  }
+
+  let trailAlpha = 0;
+
+  for (const point of sample.pointer.trail ?? []) {
+    const fade = clamp01(point.fade);
+
+    if (fade <= 0 || getDitherThreshold(sample.x, sample.y) > fade) {
+      continue;
+    }
+
+    trailAlpha = Math.max(
+      trailAlpha,
+      getRevealMaskAlpha({
+        ...sample,
+        pointer: {
+          active: false,
+          fade: clamp01(trailConfig.strength),
+          x: point.x,
+          y: point.y
+        }
+      })
+    );
+  }
+
+  return Math.max(baseAlpha, trailAlpha);
 }
 
 export function getDitherThreshold(x: number, y: number): number {

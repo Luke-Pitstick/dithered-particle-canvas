@@ -131,6 +131,7 @@ export function createMockWebGL2Context({
     uniform1f: () => count("uniform1f"),
     uniform1i: () => count("uniform1i"),
     uniform2f: () => count("uniform2f"),
+    uniform4fv: () => count("uniform4fv"),
     useProgram: () => count("useProgram"),
     vertexAttribPointer: () => count("vertexAttribPointer"),
     viewport: () => count("viewport")
