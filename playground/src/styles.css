@@ -16,7 +16,7 @@ body {
 .playground-shell {
   min-height: 100vh;
   background:
-    linear-gradient(180deg, #e9f1ee 0%, #f3efe1 58%, #d9dece 100%);
+    linear-gradient(180deg, #eef3ef 0%, #f2f0e6 56%, #dfe5d8 100%);
 }
 
 .hero {
@@ -25,6 +25,7 @@ body {
   min-height: 100vh;
   overflow: hidden;
   isolation: isolate;
+  background: #edf1e9;
 }
 
 .hero-canvas {
@@ -37,12 +38,22 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  background: #dde9e9;
+  background: #e8eee5;
+}
+
+.hero-mountains {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .hero-ui {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   grid-template-rows: auto 1fr;
   min-height: 100vh;
@@ -54,7 +65,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #1a2222;
+  color: #172123;
   font-size: 0.84rem;
   font-weight: 700;
 }
@@ -64,8 +75,8 @@ body {
   width: 42px;
   height: 42px;
   place-items: center;
-  border: 1px solid rgba(20, 26, 28, 0.42);
-  background: rgba(246, 242, 224, 0.58);
+  border: 1px solid rgba(19, 27, 28, 0.44);
+  background: rgba(246, 244, 232, 0.68);
   letter-spacing: 0;
 }
 
@@ -85,7 +96,7 @@ body {
 
 .hero-copy p {
   margin: 0 0 14px;
-  color: #465f65;
+  color: #3d5e65;
   font-size: 0.92rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -94,7 +105,7 @@ body {
 .hero-copy h1 {
   max-width: 780px;
   margin: 0;
-  color: #13171a;
+  color: #111719;
   font-size: clamp(3rem, 8.3vw, 7.6rem);
   line-height: 0.93;
   letter-spacing: 0;
@@ -105,7 +116,7 @@ body {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 28px;
-  color: #161c1e;
+  color: #121a1c;
   font-size: 0.86rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -115,8 +126,8 @@ body {
   display: inline-flex;
   min-height: 38px;
   align-items: center;
-  border: 1px solid rgba(20, 26, 28, 0.5);
-  background: rgba(242, 238, 222, 0.7);
+  border: 1px solid rgba(20, 26, 28, 0.46);
+  background: rgba(245, 243, 232, 0.72);
   padding: 0 16px;
 }
 
