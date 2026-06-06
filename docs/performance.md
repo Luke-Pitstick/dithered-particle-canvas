@@ -80,6 +80,38 @@ Guidance:
 - Avoid swapping layer config every React render; memoize layer objects when possible.
 - `maxTextureSize` exists in the public quality type for release compatibility, but current hard runtime control is `resolutionScale`.
 
+## Visual Coarseness vs Internal Resolution
+
+Browserbase-style low-resolution art direction uses two independent controls:
+
+- `quality.resolutionScale` lowers backing canvas and texture dimensions. This can reduce memory and fill-rate work, but the component still fills the same CSS layout box.
+- `dither.pixelSize` makes ordered dither thresholds advance in larger visual blocks. This changes the look and is honored by both WebGL2 preprocessing and the Canvas2D fallback.
+
+Use them together when the intended result is visibly lower resolution:
+
+```tsx
+<DitheredParticleCanvas
+  layers={{
+    background: {
+      src: "/background.png",
+      dither: { amount: 0.9, matrixSize: 8, palette: "browserbase", pixelSize: 3 }
+    },
+    foreground: {
+      src: "/foreground.png",
+      dither: false
+    }
+  }}
+  quality={{ backend: "auto", resolutionScale: 0.5, targetFps: 60 }}
+  revealLayer="background"
+/>
+```
+
+For fallback-heavy environments, keep the same visual `pixelSize` and force Canvas2D with a lower frame target:
+
+```tsx
+quality={{ backend: "canvas2d", resolutionScale: 0.5, targetFps: 30 }}
+```
+
 ## CORS and Export Constraints
 
 The renderer needs readable pixels. Browser image display rules are more permissive than canvas pixel-read rules, so an image can appear loadable while still tainting the canvas.

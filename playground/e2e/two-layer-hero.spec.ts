@@ -151,6 +151,31 @@ test("Canvas2D fallback mode still renders the hero", async ({ page }) => {
   expect(summary.uniqueColors).toBeGreaterThan(2);
 });
 
+test("lower-resolution Browserbase setting keeps layout size stable in WebGL2 mode", async ({ page }) => {
+  await gotoReady(page, "/?backend=webgl2");
+
+  const diagnostics = await getDiagnostics(page);
+
+  if (diagnostics.stats?.backend !== "webgl2") {
+    test.info().annotations.push({
+      type: "skip-detail",
+      description: "WebGL2 was unavailable, so auto fallback handled this browser."
+    });
+    return;
+  }
+
+  await expectLowResolutionCanvas(page, 0.5);
+});
+
+test("lower-resolution Browserbase setting keeps layout size stable in Canvas2D mode", async ({ page }) => {
+  await gotoReady(page, "/?backend=canvas2d");
+
+  const diagnostics = await getDiagnostics(page);
+
+  expect(diagnostics.stats?.backend).toBe("canvas2d");
+  await expectLowResolutionCanvas(page, 0.5);
+});
+
 test("render loop and GPU uploads stay idle after initial render", async ({ page }) => {
   await gotoReady(page);
   await page.waitForTimeout(700);
@@ -377,6 +402,26 @@ async function getCounters(page: Page): Promise<BrowserCounters> {
     ...((Reflect.get(window, "__dpcBrowserCounters") as Record<string, number>) ?? {}),
     frames: window.__dpcPlayground?.stats?.frames ?? 0
   })) as Promise<BrowserCounters>;
+}
+
+async function expectLowResolutionCanvas(page: Page, scale: number): Promise<void> {
+  const metrics = await page.locator("[data-dpc-canvas]").evaluate((canvas) => {
+    const element = canvas as HTMLCanvasElement;
+    const rect = element.getBoundingClientRect();
+
+    return {
+      attrHeight: element.height,
+      attrWidth: element.width,
+      cssHeight: rect.height,
+      cssWidth: rect.width,
+      dpr: window.devicePixelRatio
+    };
+  });
+
+  expect(metrics.cssWidth).toBeGreaterThan(600);
+  expect(metrics.cssHeight).toBeGreaterThan(300);
+  expect(metrics.attrWidth).toBe(Math.round(metrics.cssWidth * metrics.dpr * scale));
+  expect(metrics.attrHeight).toBe(Math.round(metrics.cssHeight * metrics.dpr * scale));
 }
 
 function colorDistance(left: Rgba, right: Rgba): number {

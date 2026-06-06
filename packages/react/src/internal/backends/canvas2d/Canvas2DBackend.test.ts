@@ -4,6 +4,20 @@ import { createImageData } from "../../utils/image-data";
 import { Canvas2DBackend } from "./Canvas2DBackend";
 
 describe("Canvas2DBackend oracle", () => {
+  it("applies the measured backing size during init", () => {
+    const canvas = {
+      getContext: () => null,
+      height: 720,
+      width: 1280
+    } as unknown as HTMLCanvasElement;
+    const backend = new Canvas2DBackend();
+
+    backend.init(canvas, { dpr: 0.5, height: 360, width: 640 });
+
+    expect(canvas.width).toBe(640);
+    expect(canvas.height).toBe(360);
+  });
+
   it("produces deterministic ImageData from fixed generated layer fixtures", () => {
     const backend = new Canvas2DBackend();
     backend.resize({ height: 1, width: 1 });

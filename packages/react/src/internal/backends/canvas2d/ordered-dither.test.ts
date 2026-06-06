@@ -34,4 +34,30 @@ describe("ordered dither", () => {
       255, 255, 255, 255
     ]);
   });
+
+  it("uses pixelSize to group ordered dither thresholds into visibly coarser blocks", () => {
+    const input = createImageData(
+      4,
+      1,
+      new Uint8ClampedArray([
+        128, 128, 128, 255,
+        128, 128, 128, 255,
+        128, 128, 128, 255,
+        128, 128, 128, 255
+      ])
+    );
+    const output = applyOrderedDither(input, {
+      amount: 1,
+      matrixSize: 4,
+      palette: "mono",
+      pixelSize: 2
+    });
+
+    expect([...output.data]).toEqual([
+      0, 0, 0, 255,
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+      255, 255, 255, 255
+    ]);
+  });
 });

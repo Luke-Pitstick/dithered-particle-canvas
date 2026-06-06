@@ -35,7 +35,7 @@ export class Canvas2DBackend implements RenderBackend {
   init(canvas: HTMLCanvasElement, size: RenderSize): void {
     this.#canvas = canvas;
     this.#context = canvas.getContext("2d") ?? undefined;
-    this.#size = size;
+    this.resize(size);
   }
 
   setLayers(layers: NormalizedLayers): void {

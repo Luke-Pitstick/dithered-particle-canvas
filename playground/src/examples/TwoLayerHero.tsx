@@ -9,6 +9,8 @@ import {
 
 const HERO_WIDTH = 1280;
 const HERO_HEIGHT = 720;
+const BROWSERBASE_LOW_RESOLUTION_SCALE = 0.5;
+const BROWSERBASE_DITHER_PIXEL_SIZE = 3;
 const FOREGROUND_MOUNTAINS_SRC = "/dithereffecttest_fg.jpg";
 const MOUNTAIN_PALETTE = {
   black: [8, 12, 14],
@@ -69,14 +71,26 @@ export function TwoLayerHero() {
   );
   const quality = useMemo<QualityConfig>(() => {
     if (mode.backend === "canvas2d") {
-      return { backend: "canvas2d", resolutionScale: 0.5, targetFps: 30 };
+      return {
+        backend: "canvas2d",
+        resolutionScale: BROWSERBASE_LOW_RESOLUTION_SCALE,
+        targetFps: 30
+      };
     }
 
     if (mode.backend === "webgl2") {
-      return { backend: "webgl2", resolutionScale: 0.58, targetFps: 60 };
+      return {
+        backend: "webgl2",
+        resolutionScale: BROWSERBASE_LOW_RESOLUTION_SCALE,
+        targetFps: 60
+      };
     }
 
-    return { backend: "auto", resolutionScale: 0.58, targetFps: 60 };
+    return {
+      backend: "auto",
+      resolutionScale: BROWSERBASE_LOW_RESOLUTION_SCALE,
+      targetFps: 60
+    };
   }, [mode.backend]);
 
   useEffect(() => {
@@ -235,7 +249,12 @@ function createHeroLayers(
 ): { background: DitheredLayer; foreground: DitheredLayer } {
   return {
     background: {
-      dither: { amount: 0.9, matrixSize: 8, palette: "browserbase", pixelSize: 2 },
+      dither: {
+        amount: 0.9,
+        matrixSize: 8,
+        palette: "browserbase",
+        pixelSize: BROWSERBASE_DITHER_PIXEL_SIZE
+      },
       fit: invalid ? "cover" : "stretch",
       filters: [
         { type: "contrast", amount: 1.06 },

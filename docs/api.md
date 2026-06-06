@@ -92,7 +92,35 @@ type DitherConfig = {
 };
 ```
 
-`amount` controls dither strength. `matrixSize` selects ordered Bayer dither size. `pixelSize` is available for coarse pixel grouping. `palette` can keep source colors, use built-in palettes, or use a custom string array of CSS colors.
+`amount` controls dither strength. `matrixSize` selects ordered Bayer dither size. `pixelSize` groups Bayer threshold samples into larger blocks for visibly coarser dithering. `palette` can keep source colors, use built-in palettes, or use a custom string array of CSS colors.
+
+## Lower Visual Resolution
+
+Use the existing `quality.resolutionScale` and per-layer `dither.pixelSize` props together for Browserbase-style low-resolution heroes:
+
+```tsx
+<DitheredParticleCanvas
+  layers={{
+    background: {
+      src: "/background.png",
+      dither: {
+        amount: 0.9,
+        matrixSize: 8,
+        palette: "browserbase",
+        pixelSize: 3
+      }
+    },
+    foreground: {
+      src: "/foreground.png",
+      dither: false
+    }
+  }}
+  quality={{ backend: "auto", resolutionScale: 0.5, targetFps: 60 }}
+  revealLayer="background"
+/>
+```
+
+`resolutionScale` lowers the internal canvas/backing texture size while the CSS layout remains responsive. `dither.pixelSize` changes the apparent art direction by making the ordered dither pattern chunkier. Use both when you want a deliberate low-res look; lower only `resolutionScale` when you want memory/performance savings without making the dither pattern coarser.
 
 ## Filters
 
@@ -140,7 +168,7 @@ Quality guidance:
 - `"low"` uses a smaller internal resolution scale.
 - `"medium"` is a balanced fallback-friendly setting.
 - `"high"` and `"auto"` currently use full internal scale.
-- `resolutionScale` multiplies device pixel ratio and is the main V1 memory/performance knob.
+- `resolutionScale` multiplies device pixel ratio and is the main V1 memory/performance knob. It does not change the CSS box size.
 - `backend: "auto"` and `backend: "webgl2"` prefer WebGL2, then fall back to Canvas2D if needed.
 - `backend: "canvas2d"` forces the fallback backend.
 - `maxTextureSize` and `targetFps` are part of the public config shape for release compatibility; use `resolutionScale` for the current hard limit.
