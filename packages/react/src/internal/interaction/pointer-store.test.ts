@@ -32,6 +32,89 @@ describe("pointer store", () => {
     });
   });
 
+  it("honors custom fade timing when trails are disabled", () => {
+    const fastStore = new RevealPointerStore();
+
+    fastStore.move(
+      { clientX: 20, clientY: 30 },
+      { height: 100, left: 0, top: 0, width: 100 },
+      { height: 100, width: 100 },
+      0
+    );
+    fastStore.leave(10);
+
+    expect(fastStore.getSnapshot({ now: 70, reveal: { fadeMs: 120 } }).fade).toBe(0.5);
+    expect(fastStore.getSnapshot({ now: 140, reveal: { fadeMs: 120 } }).fade).toBe(0);
+
+    const slowStore = new RevealPointerStore();
+
+    slowStore.move(
+      { clientX: 20, clientY: 30 },
+      { height: 100, left: 0, top: 0, width: 100 },
+      { height: 100, width: 100 },
+      0
+    );
+    slowStore.leave(10);
+
+    expect(slowStore.getSnapshot({ now: 260, reveal: { fadeMs: 600 } }).fade).toBeGreaterThan(0.5);
+  });
+
+  it("uses trail duration for the lifetime of dust remnants", () => {
+    const store = new RevealPointerStore();
+    const reveal = {
+      trail: {
+        durationMs: 300,
+        idleMs: 80,
+        maxPoints: 4,
+        spacing: 0
+      }
+    };
+
+    store.move(
+      { clientX: 40, clientY: 40 },
+      { height: 100, left: 0, top: 0, width: 100 },
+      { height: 100, width: 100 },
+      0,
+      { reveal }
+    );
+    store.leave(10, { reveal });
+
+    expect(store.getSnapshot({ now: 150, reveal })).toMatchObject({
+      active: false,
+      fade: 0
+    });
+    expect(store.getSnapshot({ now: 150, reveal }).trail?.[0]?.fade).toBe(0.5);
+    expect(store.getSnapshot({ now: 330, reveal }).trail).toBeUndefined();
+    expect(store.isFadeActive({ now: 330, reveal })).toBe(false);
+  });
+
+  it("uses trail dust instead of solid fade after a trail-enabled leave", () => {
+    const store = new RevealPointerStore();
+    const reveal = {
+      fadeMs: 600,
+      trail: {
+        durationMs: 300,
+        idleMs: 80,
+        maxPoints: 4,
+        spacing: 0
+      }
+    };
+
+    store.move(
+      { clientX: 40, clientY: 40 },
+      { height: 100, left: 0, top: 0, width: 100 },
+      { height: 100, width: 100 },
+      0,
+      { reveal }
+    );
+
+    const snapshot = store.leave(10, { reveal });
+
+    expect(snapshot.active).toBe(false);
+    expect(snapshot.fade).toBe(0);
+    expect(snapshot.trail).toHaveLength(1);
+  });
+
   it("disables inactive fade animation for reduced motion", () => {
     const store = new RevealPointerStore();
 
@@ -113,6 +196,10 @@ describe("pointer store", () => {
     );
 
     expect(store.getSnapshot({ now: 60, reveal })).toMatchObject({
+      active: true,
+      fade: 1
+    });
+    expect(store.getSnapshot({ now: 80, reveal })).toMatchObject({
       active: true,
       fade: 1
     });

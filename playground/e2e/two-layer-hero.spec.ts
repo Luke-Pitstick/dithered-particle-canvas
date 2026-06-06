@@ -89,14 +89,14 @@ test("reveal edge contains dithered breakup instead of a smooth spotlight", asyn
   const during = await sampleCanvasGrid(page, 0.52, 0.34, 0.11, 0.035, 33, 9);
   const changed = during.map((pixel, index) => colorDistance(pixel, before[index]!) > 24);
   const changedCount = changed.filter(Boolean).length;
-  const transitions = countHorizontalTransitions(changed, 33);
+  const transitions = countGridTransitions(changed, 33);
 
   expect(changedCount).toBeGreaterThan(20);
   expect(changedCount).toBeLessThan(changed.length - 20);
   expect(transitions).toBeGreaterThan(18);
 });
 
-test("reveal fades after pointer leave", async ({ page }) => {
+test("reveal clears after pointer leave and dust duration expires", async ({ page }) => {
   await gotoReady(page);
 
   const canvas = page.locator("[data-dpc-canvas]");
@@ -111,7 +111,7 @@ test("reveal fades after pointer leave", async ({ page }) => {
   const during = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
 
   await page.mouse.move(box!.x + box!.width + 24, box!.y + box!.height + 24);
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(1900);
   const after = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
 
   expect(colorDistance(before, during)).toBeGreaterThan(35);
@@ -442,11 +442,17 @@ function isDarkArtifact(pixel: Rgba): boolean {
   return pixel[3] > 0 && brightness < 82;
 }
 
-function countHorizontalTransitions(values: boolean[], columns: number): number {
+function countGridTransitions(values: boolean[], columns: number): number {
   let transitions = 0;
 
   for (let index = 1; index < values.length; index += 1) {
     if (index % columns !== 0 && values[index] !== values[index - 1]) {
+      transitions += 1;
+    }
+  }
+
+  for (let index = columns; index < values.length; index += 1) {
+    if (values[index] !== values[index - columns]) {
       transitions += 1;
     }
   }

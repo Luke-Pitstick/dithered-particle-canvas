@@ -200,6 +200,7 @@ describe("reveal mask", () => {
     expect(getRevealFade({ active: true, elapsedSinceInactiveMs: 999 })).toBe(1);
     expect(getRevealFade({ active: false, elapsedSinceInactiveMs: 225, fadeMs: 450 })).toBe(0.5);
     expect(getRevealFade({ active: false, elapsedSinceInactiveMs: 500, fadeMs: 450 })).toBe(0);
+    expect(getRevealFade({ active: false, elapsedSinceInactiveMs: 1, fadeMs: 0 })).toBe(0);
     expect(
       getRevealFade({
         active: false,

@@ -81,7 +81,10 @@ export class Canvas2DBackend implements RenderBackend {
     const pointer = this.#pointer;
     const reveal = revealLayer === "background" ? layers.foreground?.reveal : layers.background?.reveal;
 
-    if (!reveal || (!pointer.active && (pointer.fade ?? 0) <= 0)) {
+    if (
+      !reveal ||
+      (!pointer.active && (pointer.fade ?? 0) <= 0 && (pointer.trail?.length ?? 0) === 0)
+    ) {
       return base;
     }
 

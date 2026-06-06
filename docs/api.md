@@ -204,11 +204,35 @@ type RevealInteractionConfig = {
 };
 ```
 
-Defaults are tuned for a soft reveal with a dithered, broken-up edge. `radius` controls the reveal size, `strength` controls blend intensity, `softness` controls falloff, `edgeDither` controls fragmented pixel dropout around the edge, `edgeNoise` controls deterministic non-round radius variation in the soft edge, and `fadeMs` controls how long the reveal takes to disappear after pointer leave.
+Defaults are tuned for a soft reveal with a dithered, broken-up edge. `radius` controls the reveal size, `strength` controls blend intensity, `softness` controls falloff, `edgeDither` controls fragmented pixel dropout around the edge, `edgeNoise` controls deterministic non-round radius variation in the soft edge, and `fadeMs` controls how long the solid reveal fades after pointer leave when trail is disabled.
 
 `edgeNoise` defaults to `0`, which preserves the circular mask. Values are clamped to `0..1`; subtle Browserbase-style edges usually sit around `0.2..0.35`. The stable core remains circular and full-strength, while only the soft outer band varies.
 
-Set `trail` to leave a bounded afterimage behind pointer movement. `durationMs` controls how long each stamp remains, `idleMs` controls how quickly an in-bounds stopped cursor dissolves into dust, `maxPoints` caps the work per frame, `spacing` avoids oversampling tiny pointer moves, and `strength` controls how intense old stamps are.
+Set `trail` to leave a bounded afterimage behind pointer movement. `durationMs` controls how long each stamp remains, `idleMs` controls how quickly an in-bounds stopped cursor dissolves into dust, `maxPoints` caps the work per frame, `spacing` avoids oversampling tiny pointer moves, and `strength` controls how intense old stamps are. When `trail` is enabled and the pointer leaves or idles past `idleMs`, the solid reveal clears and the visible disappearance is controlled by trail dust.
+
+Fast snap-away reveal:
+
+```tsx
+reveal={{
+  fadeMs: 120,
+  trail: false
+}}
+```
+
+Lingering Browserbase-style dust:
+
+```tsx
+reveal={{
+  fadeMs: 520,
+  trail: {
+    durationMs: 1600,
+    idleMs: 360,
+    maxPoints: 32,
+    spacing: 16,
+    strength: 0.9
+  }
+}}
+```
 
 ## Callbacks
 

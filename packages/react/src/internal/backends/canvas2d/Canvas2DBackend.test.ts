@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeLayer } from "../../layers/layer-state";
-import { createImageData } from "../../utils/image-data";
+import { createImageData, getPixel } from "../../utils/image-data";
 import { Canvas2DBackend } from "./Canvas2DBackend";
 
 describe("Canvas2DBackend oracle", () => {
@@ -90,4 +90,76 @@ describe("Canvas2DBackend oracle", () => {
       255, 255, 255, 100
     ]);
   });
+
+  it("renders trail-only reveal frames after the solid pointer fade clears", () => {
+    const backend = new Canvas2DBackend();
+    backend.resize({ height: 3, width: 3 });
+
+    const background = normalizeLayer(
+      "background",
+      {
+        dither: false,
+        fit: "stretch",
+        src: "fixture-background"
+      },
+      {
+        height: 3,
+        imageData: createSolidImageData(3, 3, [255, 0, 0, 255]),
+        kind: "image-data",
+        width: 3
+      }
+    );
+    const foreground = normalizeLayer(
+      "foreground",
+      {
+        dither: false,
+        fit: "stretch",
+        reveal: {
+          edgeDither: 0,
+          radius: 2,
+          softness: 0,
+          trail: {
+            durationMs: 200,
+            strength: 1
+          }
+        },
+        src: "fixture-foreground"
+      },
+      {
+        height: 3,
+        imageData: createSolidImageData(3, 3, [0, 0, 0, 255]),
+        kind: "image-data",
+        width: 3
+      }
+    );
+
+    backend.setPointer({
+      active: false,
+      fade: 0,
+      trail: [{ fade: 1, x: 1, y: 1 }],
+      x: 1,
+      y: 1
+    });
+
+    const output = backend.renderToImageData({ background, foreground });
+
+    expect(getPixel(output, 1, 1)).toEqual([255, 0, 0, 255]);
+  });
 });
+
+function createSolidImageData(
+  width: number,
+  height: number,
+  pixel: readonly [number, number, number, number]
+): ImageData {
+  const data = new Uint8ClampedArray(width * height * 4);
+
+  for (let index = 0; index < data.length; index += 4) {
+    data[index] = pixel[0];
+    data[index + 1] = pixel[1];
+    data[index + 2] = pixel[2];
+    data[index + 3] = pixel[3];
+  }
+
+  return createImageData(width, height, data);
+}
