@@ -9,9 +9,16 @@ import {
 
 const HERO_WIDTH = 1280;
 const HERO_HEIGHT = 720;
-const BROWSERBASE_LOW_RESOLUTION_SCALE = 0.5;
-const BROWSERBASE_DITHER_PIXEL_SIZE = 3;
-const FOREGROUND_MOUNTAINS_SRC = "/dithereffecttest_fg.jpg";
+const BROWSERBASE_LOW_RESOLUTION_SCALE = 0.42;
+const BROWSERBASE_BACKGROUND_PIXEL_SIZE = 4;
+const BROWSERBASE_FOREGROUND_PIXEL_SIZE = 6;
+const BROWSERBASE_REVEAL_EDGE_NOISE = 0.56;
+const BROWSERBASE_REVEAL_EDGE_DITHER = 0.94;
+const BROWSERBASE_REVEAL_FADE_MS = 220;
+const BROWSERBASE_TRAIL_DURATION_MS = 720;
+const BROWSERBASE_TRAIL_IDLE_MS = 120;
+const BACKGROUND_REVEAL_SRC = "/background.jpg";
+const FOREGROUND_MOUNTAINS_SRC = "/chautauqua-flatirons_fg.jpg";
 const MOUNTAIN_PALETTE = {
   black: [8, 12, 14],
   green: [119, 203, 45],
@@ -253,7 +260,7 @@ function createHeroLayers(
         amount: 0.9,
         matrixSize: 8,
         palette: "browserbase",
-        pixelSize: BROWSERBASE_DITHER_PIXEL_SIZE
+        pixelSize: BROWSERBASE_BACKGROUND_PIXEL_SIZE
       },
       fit: invalid ? "cover" : "stretch",
       filters: [
@@ -261,15 +268,15 @@ function createHeroLayers(
         { type: "brightness", amount: 1.02 }
       ],
       reveal: {
-        edgeDither: 0.82,
-        edgeNoise: 0.28,
-        fadeMs: 520,
+        edgeDither: BROWSERBASE_REVEAL_EDGE_DITHER,
+        edgeNoise: BROWSERBASE_REVEAL_EDGE_NOISE,
+        fadeMs: BROWSERBASE_REVEAL_FADE_MS,
         radius: 190,
-        softness: 0.5,
+        softness: 0.58,
         strength: 1,
         trail: {
-          durationMs: 1600,
-          idleMs: 360,
+          durationMs: BROWSERBASE_TRAIL_DURATION_MS,
+          idleMs: BROWSERBASE_TRAIL_IDLE_MS,
           maxPoints: 32,
           spacing: 16,
           strength: 0.9
@@ -284,15 +291,15 @@ function createHeroLayers(
       fit: "stretch",
       filters: [{ type: "contrast", amount: 1.02 }],
       reveal: {
-        edgeDither: 0.82,
-        edgeNoise: 0.28,
-        fadeMs: 520,
+        edgeDither: BROWSERBASE_REVEAL_EDGE_DITHER,
+        edgeNoise: BROWSERBASE_REVEAL_EDGE_NOISE,
+        fadeMs: BROWSERBASE_REVEAL_FADE_MS,
         radius: 190,
-        softness: 0.5,
+        softness: 0.58,
         strength: 1,
         trail: {
-          durationMs: 1600,
-          idleMs: 360,
+          durationMs: BROWSERBASE_TRAIL_DURATION_MS,
+          idleMs: BROWSERBASE_TRAIL_IDLE_MS,
           maxPoints: 32,
           spacing: 16,
           strength: 0.9
@@ -304,59 +311,24 @@ function createHeroLayers(
 }
 
 async function loadSkyRevealBackground(width: number, height: number): Promise<ImageData> {
-  return createSkyRevealImageData(width, height);
-}
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.decoding = "async";
+  image.src = BACKGROUND_REVEAL_SRC;
+  await image.decode();
 
-function createSkyRevealImageData(width: number, height: number): ImageData {
-  const image = new ImageData(width, height);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
 
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4;
-      const u = x / width;
-      const v = y / height;
-      const cloud =
-        softCloud(u, v, 0.24, 0.36, 0.27, 0.2, 0.7) +
-        softCloud(u, v, 0.42, 0.3, 0.24, 0.18, 0.52) +
-        softCloud(u, v, 0.59, 0.42, 0.34, 0.22, 0.38);
-      const ripple = Math.sin(x / 54 + y / 83) * 0.04 + Math.cos((x - y) / 137) * 0.035;
-      const cloudMix = clamp01Value(cloud + ripple);
-      const grain = (((x * 13 + y * 29) % 23) - 11) * 0.55;
-      const sky = [
-        86 + v * 38 + grain,
-        145 + v * 40 + grain,
-        215 + v * 22 + grain
-      ] as const;
-      const cloudColor = [
-        223 + v * 14 + grain,
-        232 + v * 10 + grain,
-        235 + v * 6 + grain
-      ] as const;
-
-      image.data[index] = clampByte(mixNumber(sky[0], cloudColor[0], cloudMix));
-      image.data[index + 1] = clampByte(mixNumber(sky[1], cloudColor[1], cloudMix));
-      image.data[index + 2] = clampByte(mixNumber(sky[2], cloudColor[2], cloudMix));
-      image.data[index + 3] = 255;
-    }
+  if (!context) {
+    throw new Error("Canvas2D is unavailable for background image loading.");
   }
 
-  return image;
-}
+  context.drawImage(image, 0, 0, width, height);
 
-function softCloud(
-  x: number,
-  y: number,
-  centerX: number,
-  centerY: number,
-  radiusX: number,
-  radiusY: number,
-  strength: number
-): number {
-  const dx = (x - centerX) / radiusX;
-  const dy = (y - centerY) / radiusY;
-  const distance = dx * dx + dy * dy;
-
-  return Math.max(0, 1 - distance) * strength;
+  return context.getImageData(0, 0, width, height);
 }
 
 function createIdleSurfaceImageData(width: number, height: number): ImageData {
@@ -410,23 +382,24 @@ async function loadMattedMountainForeground(
   const imageData = context.getImageData(0, 0, width, height);
 
   applyConnectedSkyMatte(imageData);
-  pixelateOpaqueForeground(imageData, 4);
+  pixelateOpaqueForeground(imageData, BROWSERBASE_FOREGROUND_PIXEL_SIZE);
   applyMountainPalette(imageData);
 
   return imageData;
 }
 
 function applyConnectedSkyMatte(image: ImageData): void {
+  const skyColor = estimateSkyColor(image);
   const visited = new Uint8Array(image.width * image.height);
   const queue: number[] = [];
 
   for (let x = 0; x < image.width; x += 1) {
-    seedSkyPixel(image, visited, queue, x, 0);
+    seedSkyPixel(image, visited, queue, skyColor, x, 0);
   }
 
   for (let y = 1; y < image.height; y += 1) {
-    seedSkyPixel(image, visited, queue, 0, y);
-    seedSkyPixel(image, visited, queue, image.width - 1, y);
+    seedSkyPixel(image, visited, queue, skyColor, 0, y);
+    seedSkyPixel(image, visited, queue, skyColor, image.width - 1, y);
   }
 
   for (let head = 0; head < queue.length; head += 1) {
@@ -441,7 +414,7 @@ function applyConnectedSkyMatte(image: ImageData): void {
     ] as const;
 
     for (const [nextX, nextY] of neighbors) {
-      seedSkyPixel(image, visited, queue, nextX, nextY);
+      seedSkyPixel(image, visited, queue, skyColor, nextX, nextY);
     }
   }
 
@@ -463,17 +436,75 @@ function applyConnectedSkyMatte(image: ImageData): void {
         isVisited(originalAlpha, image.width, image.height, x, y + 1) ||
         isVisited(originalAlpha, image.width, image.height, x, y - 1);
 
-      if (touchesSky && isPaleSkyPixel(image, x, y, 136)) {
+      if (touchesSky && isSkyColorPixel(image, skyColor, x, y, 132, 90)) {
         image.data[alphaIndex] = 160;
       }
     }
   }
 }
 
+type RgbColor = {
+  b: number;
+  g: number;
+  r: number;
+};
+
+function estimateSkyColor(image: ImageData): RgbColor {
+  let topImageY = 0;
+
+  while (topImageY < image.height && !rowHasOpaquePixel(image, topImageY)) {
+    topImageY += 1;
+  }
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let count = 0;
+  const sampleHeight = Math.min(image.height, topImageY + 24);
+
+  for (let y = topImageY; y < sampleHeight; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const pixel = getOpaquePixel(image, x, y);
+
+      if (!pixel || getBrightness(pixel) < 150) {
+        continue;
+      }
+
+      r += pixel.r;
+      g += pixel.g;
+      b += pixel.b;
+      count += 1;
+    }
+  }
+
+  if (count === 0) {
+    return { b: 235, g: 235, r: 235 };
+  }
+
+  return {
+    b: b / count,
+    g: g / count,
+    r: r / count
+  };
+}
+
+function rowHasOpaquePixel(image: ImageData, y: number): boolean {
+  for (let x = 0; x < image.width; x += 1) {
+    const index = (y * image.width + x) * 4;
+
+    if ((image.data[index + 3] ?? 0) > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function seedSkyPixel(
   image: ImageData,
   visited: Uint8Array,
   queue: number[],
+  skyColor: RgbColor,
   x: number,
   y: number
 ): void {
@@ -483,7 +514,7 @@ function seedSkyPixel(
 
   const offset = y * image.width + x;
 
-  if (visited[offset] === 1 || !isPaleSkyPixel(image, x, y, 168)) {
+  if (visited[offset] === 1 || !isSkyColorPixel(image, skyColor, x, y, 150, 74)) {
     return;
   }
 
@@ -501,30 +532,55 @@ function isVisited(
   return x >= 0 && x < width && y >= 0 && y < height && visited[y * width + x] === 1;
 }
 
-function isPaleSkyPixel(image: ImageData, x: number, y: number, minimumBrightness: number): boolean {
-  const index = (y * image.width + x) * 4;
-  const r = image.data[index] ?? 0;
-  const g = image.data[index + 1] ?? 0;
-  const b = image.data[index + 2] ?? 0;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const brightness = (r + g + b) / 3;
-  const chroma = max - min;
+function isSkyColorPixel(
+  image: ImageData,
+  skyColor: RgbColor,
+  x: number,
+  y: number,
+  minimumBrightness: number,
+  maximumDistance: number
+): boolean {
+  const pixel = getOpaquePixel(image, x, y);
 
-  return brightness >= minimumBrightness && chroma <= 58;
+  if (!pixel) {
+    return false;
+  }
+
+  const brightness = getBrightness(pixel);
+  const distance = getColorDistance(pixel, skyColor);
+
+  return brightness >= minimumBrightness && distance <= maximumDistance;
 }
 
+function getOpaquePixel(image: ImageData, x: number, y: number): RgbColor | undefined {
+  const index = (y * image.width + x) * 4;
+  const alpha = image.data[index + 3] ?? 0;
+
+  if (alpha === 0) {
+    return undefined;
+  }
+
+  return {
+    b: image.data[index + 2] ?? 0,
+    g: image.data[index + 1] ?? 0,
+    r: image.data[index] ?? 0
+  };
+}
+
+function getBrightness(color: RgbColor): number {
+  return (color.r + color.g + color.b) / 3;
+}
+
+function getColorDistance(from: RgbColor, to: RgbColor): number {
+  const r = from.r - to.r;
+  const g = from.g - to.g;
+  const b = from.b - to.b;
+
+  return Math.sqrt(r * r + g * g + b * b);
+}
 
 function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
-}
-
-function clamp01Value(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
-
-function mixNumber(from: number, to: number, amount: number): number {
-  return from * (1 - amount) + to * amount;
 }
 
 function applyMountainPalette(image: ImageData): void {

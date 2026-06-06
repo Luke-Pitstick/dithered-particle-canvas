@@ -66,7 +66,7 @@ float dustThreshold(vec2 pixel, float seed) {
 }
 
 float edgeNoise(vec2 pixel, vec2 point) {
-  vec2 cell = floor((pixel - point) / EDGE_NOISE_CELL_SIZE);
+  vec2 cell = floor(vec2(pixel.x - point.x, point.y - pixel.y) / EDGE_NOISE_CELL_SIZE);
   return fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453123);
 }
 

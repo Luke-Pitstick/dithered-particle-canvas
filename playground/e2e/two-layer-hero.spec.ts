@@ -11,6 +11,7 @@ type BrowserCounters = {
 };
 
 const SKY_REVEAL_POINT = { x: 0.68, y: 0.31 } as const;
+const BROWSERBASE_RESOLUTION_SCALE = 0.42;
 
 test.beforeEach(async ({ page }) => {
   await installBrowserCounters(page);
@@ -69,7 +70,8 @@ test("pointer reveal does not introduce a second mountain silhouette", async ({ 
   const revealSky = await samplePageGrid(page, 0.22, 0.46, 0.12, 0.035, 17, 7);
   const darkArtifacts = revealSky.filter(isDarkArtifact);
 
-  expect(isPaleNeutral(revealed)).toBe(false);
+  expect(revealed[3]).toBeGreaterThan(0);
+  expect(isDarkArtifact(revealed)).toBe(false);
   expect(darkArtifacts).toHaveLength(0);
 });
 
@@ -111,7 +113,7 @@ test("reveal clears after pointer leave and dust duration expires", async ({ pag
   const during = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
 
   await page.mouse.move(box!.x + box!.width + 24, box!.y + box!.height + 24);
-  await page.waitForTimeout(1900);
+  await page.waitForTimeout(1000);
   const after = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
 
   expect(colorDistance(before, during)).toBeGreaterThan(35);
@@ -164,7 +166,7 @@ test("lower-resolution Browserbase setting keeps layout size stable in WebGL2 mo
     return;
   }
 
-  await expectLowResolutionCanvas(page, 0.5);
+  await expectLowResolutionCanvas(page, BROWSERBASE_RESOLUTION_SCALE);
 });
 
 test("lower-resolution Browserbase setting keeps layout size stable in Canvas2D mode", async ({ page }) => {
@@ -173,7 +175,7 @@ test("lower-resolution Browserbase setting keeps layout size stable in Canvas2D 
   const diagnostics = await getDiagnostics(page);
 
   expect(diagnostics.stats?.backend).toBe("canvas2d");
-  await expectLowResolutionCanvas(page, 0.5);
+  await expectLowResolutionCanvas(page, BROWSERBASE_RESOLUTION_SCALE);
 });
 
 test("render loop and GPU uploads stay idle after initial render", async ({ page }) => {
@@ -426,14 +428,6 @@ async function expectLowResolutionCanvas(page: Page, scale: number): Promise<voi
 
 function colorDistance(left: Rgba, right: Rgba): number {
   return Math.hypot(left[0] - right[0], left[1] - right[1], left[2] - right[2], left[3] - right[3]);
-}
-
-function isPaleNeutral(pixel: Rgba): boolean {
-  const max = Math.max(pixel[0], pixel[1], pixel[2]);
-  const min = Math.min(pixel[0], pixel[1], pixel[2]);
-  const brightness = (pixel[0] + pixel[1] + pixel[2]) / 3;
-
-  return brightness > 210 && max - min < 38;
 }
 
 function isDarkArtifact(pixel: Rgba): boolean {
