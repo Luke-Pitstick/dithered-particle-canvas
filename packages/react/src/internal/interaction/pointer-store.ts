@@ -72,10 +72,17 @@ export class RevealPointerStore {
     }
 
     const revealConfig = resolveRevealConfig(reveal);
+    const trailConfig = resolveRevealTrailConfig(revealConfig.trail);
+    const elapsedSinceInactiveMs = Math.max(0, now - this.#inactiveSince);
+    const idleDissolve =
+      Boolean(trailConfig) &&
+      this.#snapshot.active &&
+      elapsedSinceInactiveMs > (trailConfig ? Math.max(0, trailConfig.idleMs) : 0);
+    const active = this.#snapshot.active && !idleDissolve;
     const fadeMs = revealConfig.fadeMs;
     const fade = getRevealFade({
-      active: this.#snapshot.active,
-      elapsedSinceInactiveMs: now - this.#inactiveSince,
+      active,
+      elapsedSinceInactiveMs,
       fadeMs,
       reducedMotion
     });
@@ -83,7 +90,8 @@ export class RevealPointerStore {
 
     this.#snapshot = {
       ...this.#snapshot,
-      fade,
+      active,
+      fade: trailConfig && !active ? 0 : fade,
       trail
     };
 

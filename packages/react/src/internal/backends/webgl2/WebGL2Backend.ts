@@ -431,7 +431,7 @@ export class WebGL2Backend implements RenderBackend {
         data[offset] = point.x;
         data[offset + 1] = this.#size.height - point.y;
         data[offset + 2] = point.fade;
-        data[offset + 3] = 0;
+        data[offset + 3] = point.x * 0.37 + point.y * 0.21;
       }
 
       gl.uniform4fv(program.uniforms.u_trailPoints, data);

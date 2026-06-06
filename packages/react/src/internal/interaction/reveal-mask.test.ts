@@ -3,6 +3,7 @@ import type { PointerSnapshot } from "../renderer/types";
 import {
   BROWSERBASE_REVEAL_PRESET,
   getDitherThreshold,
+  getDustThreshold,
   getRevealCompositeMaskAlpha,
   getRevealFade,
   getRevealMaskAlpha
@@ -90,6 +91,20 @@ describe("reveal mask", () => {
         strength: 0.5
       }
     };
+    const seed = 30 * 0.37 + 30 * 0.21;
+    const kept = findNearbyDustPixel(seed, (threshold) => threshold <= 0.5);
+    const dropped = findNearbyDustPixel(seed, (threshold) => threshold > 0.5);
+    const keptAlpha = getRevealMaskAlpha({
+      pointer: {
+        active: false,
+        fade: 0.5,
+        x: 30,
+        y: 30
+      },
+      reveal,
+      x: kept.x,
+      y: kept.y
+    });
 
     expect(
       getRevealCompositeMaskAlpha({
@@ -98,10 +113,11 @@ describe("reveal mask", () => {
           trail: [{ fade: 0.5, x: 30, y: 30 }]
         },
         reveal,
-        x: 30,
-        y: 30
+        x: kept.x,
+        y: kept.y
       })
-    ).toBe(0.5);
+    ).toBe(keptAlpha);
+    expect(keptAlpha).toBeGreaterThan(0);
     expect(
       getRevealCompositeMaskAlpha({
         pointer: {
@@ -109,8 +125,8 @@ describe("reveal mask", () => {
           trail: [{ fade: 0.5, x: 30, y: 30 }]
         },
         reveal,
-        x: 32,
-        y: 29
+        x: dropped.x,
+        y: dropped.y
       })
     ).toBe(0);
   });
@@ -129,3 +145,18 @@ describe("reveal mask", () => {
     ).toBe(0);
   });
 });
+
+function findNearbyDustPixel(
+  seed: number,
+  matches: (threshold: number) => boolean
+): { x: number; y: number } {
+  for (let y = 24; y <= 36; y += 1) {
+    for (let x = 24; x <= 36; x += 1) {
+      if (Math.hypot(x - 30, y - 30) < 10 && matches(getDustThreshold(x, y, seed))) {
+        return { x, y };
+      }
+    }
+  }
+
+  throw new Error("Expected to find a nearby dust pixel for the test threshold.");
+}

@@ -10,6 +10,8 @@ type BrowserCounters = {
   texImage2D: number;
 };
 
+const SKY_REVEAL_POINT = { x: 0.68, y: 0.31 } as const;
+
 test.beforeEach(async ({ page }) => {
   await installBrowserCounters(page);
 });
@@ -34,21 +36,41 @@ test("pointer movement reveals background pixels while distant foreground stays 
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
 
-  const center = point(box!, 0.52, 0.34);
+  const center = point(box!, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
   const stableMountain = point(box!, 0.18, 0.84);
-  const beforeReveal = await sampleCanvasPixel(page, 0.52, 0.34);
+  const beforeReveal = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
   const beforeStable = await sampleCanvasPixel(page, 0.18, 0.84);
 
   await page.mouse.move(center.x, center.y);
   await page.waitForTimeout(90);
 
-  const duringReveal = await sampleCanvasPixel(page, 0.52, 0.34);
+  const duringReveal = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
   const duringStable = await sampleCanvasPixel(page, 0.18, 0.84);
 
   expect(colorDistance(beforeReveal, duringReveal)).toBeGreaterThan(35);
   expect(colorDistance(beforeStable, duringStable)).toBeLessThan(8);
 
   await page.mouse.move(stableMountain.x, stableMountain.y);
+});
+
+test("pointer reveal does not introduce a second mountain silhouette", async ({ page }) => {
+  await gotoReady(page);
+
+  const canvas = page.locator("[data-dpc-canvas]");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+
+  const hiddenSilhouette = point(box!, 0.72, 0.5);
+
+  await page.mouse.move(hiddenSilhouette.x, hiddenSilhouette.y);
+  await page.waitForTimeout(90);
+
+  const revealed = await samplePagePixel(page, 0.72, 0.5);
+  const revealSky = await samplePageGrid(page, 0.22, 0.46, 0.12, 0.035, 17, 7);
+  const darkArtifacts = revealSky.filter(isDarkArtifact);
+
+  expect(isPaleNeutral(revealed)).toBe(false);
+  expect(darkArtifacts).toHaveLength(0);
 });
 
 test("reveal edge contains dithered breakup instead of a smooth spotlight", async ({ page }) => {
@@ -81,16 +103,16 @@ test("reveal fades after pointer leave", async ({ page }) => {
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
 
-  const center = point(box!, 0.52, 0.34);
-  const before = await sampleCanvasPixel(page, 0.52, 0.34);
+  const center = point(box!, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
+  const before = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
 
   await page.mouse.move(center.x, center.y);
   await page.waitForTimeout(80);
-  const during = await sampleCanvasPixel(page, 0.52, 0.34);
+  const during = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
 
   await page.mouse.move(box!.x + box!.width + 24, box!.y + box!.height + 24);
   await page.waitForTimeout(700);
-  const after = await sampleCanvasPixel(page, 0.52, 0.34);
+  const after = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
 
   expect(colorDistance(before, during)).toBeGreaterThan(35);
   expect(colorDistance(before, after)).toBeLessThan(10);
@@ -290,6 +312,35 @@ async function sampleCanvasPixel(page: Page, xRatio: number, yRatio: number): Pr
   return readDecodedPixel(image, xRatio, yRatio);
 }
 
+async function samplePagePixel(page: Page, xRatio: number, yRatio: number): Promise<Rgba> {
+  const image = decodePng(await page.screenshot({ fullPage: true }));
+
+  return readDecodedPixel(image, xRatio, yRatio);
+}
+
+async function samplePageGrid(
+  page: Page,
+  centerX: number,
+  centerY: number,
+  halfWidth: number,
+  halfHeight: number,
+  columns: number,
+  rows: number
+): Promise<Rgba[]> {
+  const image = decodePng(await page.screenshot({ fullPage: true }));
+  const pixels: Rgba[] = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const xRatio = centerX - halfWidth + (halfWidth * 2 * column) / (columns - 1);
+      const yRatio = centerY - halfHeight + (halfHeight * 2 * row) / (rows - 1);
+      pixels.push(readDecodedPixel(image, xRatio, yRatio));
+    }
+  }
+
+  return pixels;
+}
+
 async function sampleCanvasGrid(
   page: Page,
   centerX: number,
@@ -330,6 +381,20 @@ async function getCounters(page: Page): Promise<BrowserCounters> {
 
 function colorDistance(left: Rgba, right: Rgba): number {
   return Math.hypot(left[0] - right[0], left[1] - right[1], left[2] - right[2], left[3] - right[3]);
+}
+
+function isPaleNeutral(pixel: Rgba): boolean {
+  const max = Math.max(pixel[0], pixel[1], pixel[2]);
+  const min = Math.min(pixel[0], pixel[1], pixel[2]);
+  const brightness = (pixel[0] + pixel[1] + pixel[2]) / 3;
+
+  return brightness > 210 && max - min < 38;
+}
+
+function isDarkArtifact(pixel: Rgba): boolean {
+  const brightness = (pixel[0] + pixel[1] + pixel[2]) / 3;
+
+  return pixel[3] > 0 && brightness < 82;
 }
 
 function countHorizontalTransitions(values: boolean[], columns: number): number {

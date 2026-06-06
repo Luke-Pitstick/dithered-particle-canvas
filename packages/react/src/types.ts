@@ -19,6 +19,7 @@ export type BuiltInFilterConfig =
 
 export type RevealTrailConfig = {
   durationMs?: number;
+  idleMs?: number;
   maxPoints?: number;
   spacing?: number;
   strength?: number;

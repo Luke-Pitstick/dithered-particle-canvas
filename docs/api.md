@@ -167,6 +167,7 @@ type RevealInteractionConfig = {
   fadeMs?: number;
   trail?: boolean | {
     durationMs?: number;
+    idleMs?: number;
     maxPoints?: number;
     spacing?: number;
     strength?: number;
@@ -176,7 +177,7 @@ type RevealInteractionConfig = {
 
 Defaults are tuned for a soft reveal with a dithered, broken-up edge. `radius` controls the reveal size, `strength` controls blend intensity, `softness` controls falloff, `edgeDither` controls the fragmented edge, and `fadeMs` controls how long the reveal takes to disappear after pointer leave.
 
-Set `trail` to leave a bounded afterimage behind pointer movement. `durationMs` controls how long each stamp remains, `maxPoints` caps the work per frame, `spacing` avoids oversampling tiny pointer moves, and `strength` controls how intense old stamps are.
+Set `trail` to leave a bounded afterimage behind pointer movement. `durationMs` controls how long each stamp remains, `idleMs` controls how quickly an in-bounds stopped cursor dissolves into dust, `maxPoints` caps the work per frame, `spacing` avoids oversampling tiny pointer moves, and `strength` controls how intense old stamps are.
 
 ## Callbacks
 

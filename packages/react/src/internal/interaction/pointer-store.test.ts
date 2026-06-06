@@ -92,4 +92,34 @@ describe("pointer store", () => {
     expect(store.isFadeActive({ now: 101, reveal })).toBe(true);
     expect(store.isFadeActive({ now: 200, reveal })).toBe(false);
   });
+
+  it("dissolves an idle in-bounds pointer into trail dust", () => {
+    const store = new RevealPointerStore();
+    const reveal = {
+      trail: {
+        durationMs: 500,
+        idleMs: 80,
+        maxPoints: 4,
+        spacing: 10
+      }
+    };
+
+    store.move(
+      { clientX: 40, clientY: 40 },
+      { height: 100, left: 0, top: 0, width: 100 },
+      { height: 100, width: 100 },
+      0,
+      { reveal }
+    );
+
+    expect(store.getSnapshot({ now: 60, reveal })).toMatchObject({
+      active: true,
+      fade: 1
+    });
+    expect(store.getSnapshot({ now: 100, reveal })).toMatchObject({
+      active: false,
+      fade: 0
+    });
+    expect(store.isFadeActive({ now: 100, reveal })).toBe(true);
+  });
 });

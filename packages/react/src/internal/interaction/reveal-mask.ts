@@ -7,10 +7,13 @@ export const BROWSERBASE_REVEAL_PRESET = DEFAULT_REVEAL;
 
 export const DEFAULT_REVEAL_TRAIL: Required<RevealTrailConfig> = {
   durationMs: 900,
+  idleMs: 160,
   maxPoints: 24,
   spacing: 18,
   strength: 0.72
 };
+
+const DUST_CELL_SIZE = 2;
 
 export const REVEAL_DITHER_MATRIX = [
   [0, 8, 2, 10],
@@ -140,8 +143,9 @@ export function getRevealCompositeMaskAlpha(sample: RevealMaskSample): number {
 
   for (const point of sample.pointer.trail ?? []) {
     const fade = clamp01(point.fade);
+    const seed = point.x * 0.37 + point.y * 0.21;
 
-    if (fade <= 0 || getDitherThreshold(sample.x, sample.y) > fade) {
+    if (fade <= 0 || getDustThreshold(sample.x, sample.y, seed) > fade) {
       continue;
     }
 
@@ -167,6 +171,15 @@ export function getDitherThreshold(x: number, y: number): number {
   const column = modulo(Math.floor(x), REVEAL_DITHER_MATRIX[row].length);
 
   return (REVEAL_DITHER_MATRIX[row][column] + 0.5) / 16;
+}
+
+export function getDustThreshold(x: number, y: number, seed = 0): number {
+  const cellX = Math.floor(x / DUST_CELL_SIZE);
+  const cellY = Math.floor(y / DUST_CELL_SIZE);
+  const value =
+    Math.sin(cellX * 12.9898 + cellY * 78.233 + seed * 0.037719) * 43758.5453;
+
+  return value - Math.floor(value);
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {

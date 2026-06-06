@@ -9,7 +9,6 @@ import {
 
 const HERO_WIDTH = 1280;
 const HERO_HEIGHT = 720;
-const REVEAL_BACKGROUND_SRC = "/dithereffecttest_bg.jpg";
 const FOREGROUND_MOUNTAINS_SRC = "/dithereffecttest_fg.jpg";
 const MOUNTAIN_PALETTE = {
   black: [8, 12, 14],
@@ -61,9 +60,13 @@ export function TwoLayerHero() {
   window.__dpcPlayground = diagnostics.current;
 
   const [mountains, setMountains] = useState<ImageData | undefined>();
+  const [revealBackground, setRevealBackground] = useState<ImageData | undefined>();
   const [status, setStatus] = useState("Preparing real assets");
   const idleLayer = useMemo(() => createIdleSurfaceImageData(HERO_WIDTH, HERO_HEIGHT), []);
-  const layers = useMemo(() => createHeroLayers(mode.invalid, idleLayer), [idleLayer, mode.invalid]);
+  const layers = useMemo(
+    () => createHeroLayers(mode.invalid, idleLayer, revealBackground),
+    [idleLayer, mode.invalid, revealBackground]
+  );
   const quality = useMemo<QualityConfig>(() => {
     if (mode.backend === "canvas2d") {
       return { backend: "canvas2d", resolutionScale: 0.5, targetFps: 30 };
@@ -94,6 +97,32 @@ export function TwoLayerHero() {
       HTMLCanvasElement.prototype.toBlob = originalToBlob;
     };
   }, [mode.tainted]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (mode.invalid) {
+      return undefined;
+    }
+
+    loadSkyRevealBackground(HERO_WIDTH, HERO_HEIGHT)
+      .then((imageData) => {
+        if (!cancelled) {
+          setRevealBackground(imageData);
+        }
+      })
+      .catch((error: unknown) => {
+        diagnostics.current.errors.push({
+          message: error instanceof Error ? error.message : String(error),
+          name: error instanceof Error ? error.name : "Error"
+        });
+        setStatus("Fallback active");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode.invalid]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,12 +230,13 @@ function getRuntimeMode(): RuntimeMode {
 
 function createHeroLayers(
   invalid: boolean,
-  idleLayer: ImageData
+  idleLayer: ImageData,
+  revealBackground: ImageData | undefined
 ): { background: DitheredLayer; foreground: DitheredLayer } {
   return {
     background: {
       dither: { amount: 0.9, matrixSize: 8, palette: "browserbase", pixelSize: 2 },
-      fit: "cover",
+      fit: invalid ? "cover" : "stretch",
       filters: [
         { type: "contrast", amount: 1.06 },
         { type: "brightness", amount: 1.02 }
@@ -219,12 +249,15 @@ function createHeroLayers(
         strength: 1,
         trail: {
           durationMs: 1600,
+          idleMs: 360,
           maxPoints: 32,
           spacing: 16,
           strength: 0.9
         }
       },
-      src: invalid ? "/fixtures/missing-background.png" : REVEAL_BACKGROUND_SRC
+      src: invalid
+        ? "/fixtures/missing-background.png"
+        : ((revealBackground ?? idleLayer) as unknown as DitheredLayer["src"])
     },
     foreground: {
       dither: false,
@@ -238,6 +271,7 @@ function createHeroLayers(
         strength: 1,
         trail: {
           durationMs: 1600,
+          idleMs: 360,
           maxPoints: 32,
           spacing: 16,
           strength: 0.9
@@ -246,6 +280,62 @@ function createHeroLayers(
       src: idleLayer as unknown as DitheredLayer["src"]
     }
   };
+}
+
+async function loadSkyRevealBackground(width: number, height: number): Promise<ImageData> {
+  return createSkyRevealImageData(width, height);
+}
+
+function createSkyRevealImageData(width: number, height: number): ImageData {
+  const image = new ImageData(width, height);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const u = x / width;
+      const v = y / height;
+      const cloud =
+        softCloud(u, v, 0.24, 0.36, 0.27, 0.2, 0.7) +
+        softCloud(u, v, 0.42, 0.3, 0.24, 0.18, 0.52) +
+        softCloud(u, v, 0.59, 0.42, 0.34, 0.22, 0.38);
+      const ripple = Math.sin(x / 54 + y / 83) * 0.04 + Math.cos((x - y) / 137) * 0.035;
+      const cloudMix = clamp01Value(cloud + ripple);
+      const grain = (((x * 13 + y * 29) % 23) - 11) * 0.55;
+      const sky = [
+        86 + v * 38 + grain,
+        145 + v * 40 + grain,
+        215 + v * 22 + grain
+      ] as const;
+      const cloudColor = [
+        223 + v * 14 + grain,
+        232 + v * 10 + grain,
+        235 + v * 6 + grain
+      ] as const;
+
+      image.data[index] = clampByte(mixNumber(sky[0], cloudColor[0], cloudMix));
+      image.data[index + 1] = clampByte(mixNumber(sky[1], cloudColor[1], cloudMix));
+      image.data[index + 2] = clampByte(mixNumber(sky[2], cloudColor[2], cloudMix));
+      image.data[index + 3] = 255;
+    }
+  }
+
+  return image;
+}
+
+function softCloud(
+  x: number,
+  y: number,
+  centerX: number,
+  centerY: number,
+  radiusX: number,
+  radiusY: number,
+  strength: number
+): number {
+  const dx = (x - centerX) / radiusX;
+  const dy = (y - centerY) / radiusY;
+  const distance = dx * dx + dy * dy;
+
+  return Math.max(0, 1 - distance) * strength;
 }
 
 function createIdleSurfaceImageData(width: number, height: number): ImageData {
@@ -403,8 +493,17 @@ function isPaleSkyPixel(image: ImageData, x: number, y: number, minimumBrightnes
   return brightness >= minimumBrightness && chroma <= 58;
 }
 
+
 function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function clamp01Value(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function mixNumber(from: number, to: number, amount: number): number {
+  return from * (1 - amount) + to * amount;
 }
 
 function applyMountainPalette(image: ImageData): void {
