@@ -16,7 +16,7 @@ in vec2 v_uv;
 out vec4 outColor;
 
 void main() {
-  outColor = texture(u_texture, v_uv);
+  outColor = texture(u_texture, vec2(v_uv.x, 1.0 - v_uv.y));
 }
 `;
 

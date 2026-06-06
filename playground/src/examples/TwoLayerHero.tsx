@@ -211,11 +211,11 @@ function createForegroundImageData(width: number, height: number): ImageData {
       const index = (y * width + x) * 4;
       const skyTexture = ((x >> 3) + (y >> 3)) % 2 === 0 ? 8 : -5;
       const ridge =
-        height * 0.64 +
-        Math.sin(x / 72) * 38 +
-        Math.sin(x / 27) * 16 +
-        Math.cos(x / 153) * 46;
-      const rearRidge = height * 0.72 + Math.sin(x / 96) * 24 + Math.cos(x / 43) * 18;
+        height * 0.82 +
+        Math.sin(x / 72) * 24 +
+        Math.sin(x / 27) * 10 +
+        Math.cos(x / 153) * 28;
+      const rearRidge = height * 0.9 + Math.sin(x / 96) * 18 + Math.cos(x / 43) * 12;
       const inMountain = y > ridge;
       const inRearMountain = y > rearRidge;
 
