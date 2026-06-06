@@ -11,6 +11,13 @@ const HERO_WIDTH = 1280;
 const HERO_HEIGHT = 720;
 const REVEAL_BACKGROUND_SRC = "/dithereffecttest_bg.jpg";
 const FOREGROUND_MOUNTAINS_SRC = "/dithereffecttest_fg.jpg";
+const MOUNTAIN_PALETTE = {
+  black: [8, 12, 14],
+  green: [119, 203, 45],
+  orange: [255, 58, 18],
+  pale: [242, 239, 214],
+  yellow: [255, 218, 24]
+} as const;
 
 type PlaygroundDiagnostics = {
   errors: Array<{ code?: string; message: string; name: string }>;
@@ -209,7 +216,13 @@ function createHeroLayers(
         fadeMs: 520,
         radius: 190,
         softness: 0.5,
-        strength: 1
+        strength: 1,
+        trail: {
+          durationMs: 1600,
+          maxPoints: 32,
+          spacing: 16,
+          strength: 0.9
+        }
       },
       src: invalid ? "/fixtures/missing-background.png" : REVEAL_BACKGROUND_SRC
     },
@@ -222,7 +235,13 @@ function createHeroLayers(
         fadeMs: 520,
         radius: 190,
         softness: 0.5,
-        strength: 1
+        strength: 1,
+        trail: {
+          durationMs: 1600,
+          maxPoints: 32,
+          spacing: 16,
+          strength: 0.9
+        }
       },
       src: idleLayer as unknown as DitheredLayer["src"]
     }
@@ -273,7 +292,7 @@ async function loadMattedMountainForeground(
   const drawnWidth = image.naturalWidth * scale;
   const drawnHeight = image.naturalHeight * scale;
   const x = (width - drawnWidth) / 2;
-  const y = (height - drawnHeight) / 2;
+  const y = (height - drawnHeight) / 2 + height * 0.12;
 
   context.drawImage(image, x, y, drawnWidth, drawnHeight);
 
@@ -281,7 +300,7 @@ async function loadMattedMountainForeground(
 
   applyConnectedSkyMatte(imageData);
   pixelateOpaqueForeground(imageData, 4);
-  applyMountainDither(imageData);
+  applyMountainPalette(imageData);
 
   return imageData;
 }
@@ -388,30 +407,38 @@ function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-function applyMountainDither(image: ImageData): void {
-  const levels = 5;
-  const amount = 1;
-
+function applyMountainPalette(image: ImageData): void {
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
       const index = (y * image.width + x) * 4;
+      const alpha = image.data[index + 3] ?? 0;
 
-      if ((image.data[index + 3] ?? 0) === 0) {
+      if (alpha === 0) {
         continue;
       }
 
-      const threshold = getMountainDitherThreshold(x, y);
+      const r = image.data[index] ?? 0;
+      const g = image.data[index + 1] ?? 0;
+      const b = image.data[index + 2] ?? 0;
+      const luma = r * 0.299 + g * 0.587 + b * 0.114;
+      const threshold = (getMountainDitherThreshold(x, y) - 0.5) * 58;
+      const shade = luma + threshold;
+      const greenBias = g - Math.max(r, b);
+      const color =
+        shade < 70
+          ? MOUNTAIN_PALETTE.black
+          : greenBias > 14 && shade < 190
+            ? MOUNTAIN_PALETTE.green
+            : shade < 128
+              ? MOUNTAIN_PALETTE.orange
+              : shade < 198
+                ? MOUNTAIN_PALETTE.yellow
+                : MOUNTAIN_PALETTE.pale;
 
-      for (let channel = 0; channel < 3; channel += 1) {
-        const original = image.data[index + channel] ?? 0;
-        const scaled = (original / 255) * (levels - 1);
-        const base = Math.floor(scaled);
-        const fraction = scaled - base;
-        const stepped = Math.min(levels - 1, base + (fraction > threshold ? 1 : 0));
-        const dithered = (stepped / (levels - 1)) * 255;
-
-        image.data[index + channel] = clampByte(original * (1 - amount) + dithered * amount);
-      }
+      image.data[index] = color[0];
+      image.data[index + 1] = color[1];
+      image.data[index + 2] = color[2];
+      image.data[index + 3] = alpha > 80 ? 255 : alpha;
     }
   }
 }
