@@ -18,6 +18,7 @@ export type BuiltInFilterConfig =
   | { type: "opacity"; amount: number };
 
 export type RevealTrailConfig = {
+  dustSize?: number;
   durationMs?: number;
   idleMs?: number;
   maxPoints?: number;

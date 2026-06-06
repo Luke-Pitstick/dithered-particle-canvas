@@ -24,7 +24,6 @@ export const REVEAL_COMPOSITE_FRAGMENT_SHADER = `#version 300 es
 precision mediump float;
 
 const int MAX_TRAIL_POINTS = 32;
-const float DUST_CELL_SIZE = 2.0;
 const float EDGE_NOISE_CELL_SIZE = 18.0;
 const float EDGE_NOISE_MAX_WIDTH_MULTIPLIER = 0.7;
 
@@ -40,6 +39,7 @@ uniform float u_edgeDither;
 uniform float u_edgeNoise;
 uniform int u_revealLayer;
 uniform int u_trailCount;
+uniform float u_trailDustSize;
 uniform vec4 u_trailPoints[MAX_TRAIL_POINTS];
 uniform float u_trailStrength;
 
@@ -60,8 +60,8 @@ float bayer4(vec2 pixel) {
   return (values[index] + 0.5) / 16.0;
 }
 
-float dustThreshold(vec2 pixel, float seed) {
-  vec2 cell = floor(pixel / DUST_CELL_SIZE);
+float dustThreshold(vec2 pixel, float seed, float cellSize) {
+  vec2 cell = floor(pixel / max(1.0, cellSize));
   return fract(sin(dot(cell, vec2(12.9898, 78.233)) + seed * 0.037719) * 43758.5453);
 }
 
@@ -135,7 +135,7 @@ void main() {
 
     vec4 point = u_trailPoints[i];
 
-    if (dustThreshold(pixel, point.w) <= clamp(point.z, 0.0, 1.0)) {
+    if (dustThreshold(pixel, point.w, u_trailDustSize) <= clamp(point.z, 0.0, 1.0)) {
       mask = max(mask, revealMask(pixel, point.xy, u_trailStrength));
     }
   }

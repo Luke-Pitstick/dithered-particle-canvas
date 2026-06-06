@@ -284,6 +284,7 @@ export class WebGL2Backend implements RenderBackend {
           "u_softness",
           "u_strength",
           "u_trailCount",
+          "u_trailDustSize",
           "u_trailPoints",
           "u_trailStrength"
         ],
@@ -422,6 +423,7 @@ export class WebGL2Backend implements RenderBackend {
     gl.uniform1f(program.uniforms.u_edgeNoise, reveal.edgeNoise);
     gl.uniform1i(program.uniforms.u_revealLayer, revealLayer === "background" ? 0 : 1);
     gl.uniform1i(program.uniforms.u_trailCount, trail ? trailPoints.length : 0);
+    gl.uniform1f(program.uniforms.u_trailDustSize, trail ? Math.max(1, trail.dustSize) : 1);
     gl.uniform1f(program.uniforms.u_trailStrength, trail ? trail.strength : 0);
 
     if (trail && trailPoints.length > 0) {

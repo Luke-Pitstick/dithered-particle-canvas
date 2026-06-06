@@ -6,6 +6,7 @@ import { clamp01 } from "../utils/color";
 export const BROWSERBASE_REVEAL_PRESET = DEFAULT_REVEAL;
 
 export const DEFAULT_REVEAL_TRAIL: Required<RevealTrailConfig> = {
+  dustSize: 2,
   durationMs: 900,
   idleMs: 160,
   maxPoints: 24,
@@ -13,7 +14,6 @@ export const DEFAULT_REVEAL_TRAIL: Required<RevealTrailConfig> = {
   strength: 0.72
 };
 
-const DUST_CELL_SIZE = 2;
 const EDGE_NOISE_CELL_SIZE = 18;
 const EDGE_NOISE_MAX_WIDTH_MULTIPLIER = 0.7;
 
@@ -157,8 +157,9 @@ export function getRevealCompositeMaskAlpha(sample: RevealMaskSample): number {
   for (const point of sample.pointer.trail ?? []) {
     const fade = clamp01(point.fade);
     const seed = point.x * 0.37 + point.y * 0.21;
+    const dustSize = Math.max(1, trailConfig.dustSize);
 
-    if (fade <= 0 || getDustThreshold(sample.x, sample.y, seed) > fade) {
+    if (fade <= 0 || getDustThreshold(sample.x, sample.y, seed, dustSize) > fade) {
       continue;
     }
 
@@ -186,9 +187,10 @@ export function getDitherThreshold(x: number, y: number): number {
   return (REVEAL_DITHER_MATRIX[row][column] + 0.5) / 16;
 }
 
-export function getDustThreshold(x: number, y: number, seed = 0): number {
-  const cellX = Math.floor(x / DUST_CELL_SIZE);
-  const cellY = Math.floor(y / DUST_CELL_SIZE);
+export function getDustThreshold(x: number, y: number, seed = 0, cellSize = 2): number {
+  const safeCellSize = Math.max(1, cellSize);
+  const cellX = Math.floor(x / safeCellSize);
+  const cellY = Math.floor(y / safeCellSize);
   const value =
     Math.sin(cellX * 12.9898 + cellY * 78.233 + seed * 0.037719) * 43758.5453;
 

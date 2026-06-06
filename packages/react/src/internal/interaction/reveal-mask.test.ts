@@ -196,6 +196,14 @@ describe("reveal mask", () => {
     ).toBe(0);
   });
 
+  it("uses trail dust size to group fading particles into larger cells", () => {
+    const seed = 14;
+
+    expect(getDustThreshold(8, 8, seed, 6)).toBe(getDustThreshold(11, 11, seed, 6));
+    expect(getDustThreshold(8, 8, seed, 2)).not.toBe(getDustThreshold(11, 11, seed, 2));
+    expect(getDustThreshold(8, 8, seed, 0)).toBe(getDustThreshold(8, 8, seed, 1));
+  });
+
   it("fades out after pointer leave and clears immediately for reduced motion", () => {
     expect(getRevealFade({ active: true, elapsedSinceInactiveMs: 999 })).toBe(1);
     expect(getRevealFade({ active: false, elapsedSinceInactiveMs: 225, fadeMs: 450 })).toBe(0.5);

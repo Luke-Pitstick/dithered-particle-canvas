@@ -16,6 +16,7 @@ const BROWSERBASE_REVEAL_EDGE_NOISE = 0.56;
 const BROWSERBASE_REVEAL_EDGE_DITHER = 0.94;
 const BROWSERBASE_REVEAL_FADE_MS = 220;
 const BROWSERBASE_TRAIL_DURATION_MS = 720;
+const BROWSERBASE_TRAIL_DUST_SIZE = 6;
 const BROWSERBASE_TRAIL_IDLE_MS = 120;
 const BACKGROUND_REVEAL_SRC = "/background.jpg";
 const FOREGROUND_MOUNTAINS_SRC = "/chautauqua-flatirons_fg.jpg";
@@ -275,6 +276,7 @@ function createHeroLayers(
         softness: 0.58,
         strength: 1,
         trail: {
+          dustSize: BROWSERBASE_TRAIL_DUST_SIZE,
           durationMs: BROWSERBASE_TRAIL_DURATION_MS,
           idleMs: BROWSERBASE_TRAIL_IDLE_MS,
           maxPoints: 32,
@@ -298,6 +300,7 @@ function createHeroLayers(
         softness: 0.58,
         strength: 1,
         trail: {
+          dustSize: BROWSERBASE_TRAIL_DUST_SIZE,
           durationMs: BROWSERBASE_TRAIL_DURATION_MS,
           idleMs: BROWSERBASE_TRAIL_IDLE_MS,
           maxPoints: 32,
