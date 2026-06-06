@@ -30,6 +30,32 @@ test("renders a nonblank V1 two-layer reveal hero", async ({ browser, page }) =>
   expect(summary.uniqueColors).toBeGreaterThan(8);
 });
 
+test("layer control sliders update live playground config", async ({ page }) => {
+  await gotoReady(page);
+
+  await page.getByTestId("layer-control-background").click();
+  await expect(page.getByTestId("background-layer-popover")).toBeVisible();
+  await setSliderValue(page, "background-contrast-slider", 1.22);
+  await setSliderValue(page, "resolution-scale-slider", 0.5);
+  await waitForCanvasResolutionScale(page, 0.5);
+
+  await page.getByTestId("layer-control-background").click();
+  await expect(page.getByTestId("background-layer-popover")).toBeHidden();
+
+  await page.getByTestId("layer-control-foreground").click();
+  await expect(page.getByTestId("foreground-layer-popover")).toBeVisible();
+  await setSliderValue(page, "foreground-opacity-slider", 0.82);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("foreground-layer-popover")).toBeHidden();
+
+  await expect(page.getByRole("img", { name: "Browserbase style dithered reveal hero" })).toBeVisible();
+  expect((await getDiagnostics(page)).stats?.frames ?? 0).toBeGreaterThan(0);
+
+  const summary = await sampleCanvasSummary(page);
+
+  expect(summary.nonTransparent).toBeGreaterThan(20);
+});
+
 test("pointer movement reveals background pixels while distant foreground stays stable", async ({ page }) => {
   await gotoReady(page);
 
@@ -311,6 +337,36 @@ async function gotoReady(page: Page, url = "/"): Promise<void> {
   await page.goto(url);
   await page.waitForFunction(() => window.__dpcPlayground?.ready === true);
   await page.waitForFunction(() => (window.__dpcPlayground?.stats?.frames ?? 0) > 0);
+}
+
+async function setSliderValue(page: Page, testId: string, value: number): Promise<void> {
+  await page.getByTestId(testId).evaluate((element, nextValue) => {
+    const input = element as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+
+    valueSetter?.call(input, String(nextValue));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }, value);
+}
+
+async function waitForCanvasResolutionScale(page: Page, scale: number): Promise<void> {
+  await expect
+    .poll(async () => {
+      const metrics = await page.locator("[data-dpc-canvas]").evaluate((canvas, scaleValue) => {
+        const element = canvas as HTMLCanvasElement;
+        const rect = element.getBoundingClientRect();
+
+        return {
+          attrHeight: element.height,
+          attrWidth: element.width,
+          expectedHeight: Math.round(rect.height * window.devicePixelRatio * scaleValue),
+          expectedWidth: Math.round(rect.width * window.devicePixelRatio * scaleValue)
+        };
+      }, scale);
+
+      return metrics.attrWidth === metrics.expectedWidth && metrics.attrHeight === metrics.expectedHeight;
+    })
+    .toBe(true);
 }
 
 async function sampleCanvasSummary(page: Page): Promise<{ nonTransparent: number; uniqueColors: number }> {

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DitheredParticleCanvas,
+  type BuiltInFilterConfig,
   type DitheredCanvasHandle,
+  type DitherConfig,
   type DitheredLayer,
   type DitheredParticleCanvasProps,
-  type QualityConfig
+  type QualityConfig,
+  type RevealInteractionConfig
 } from "@dithered-particle-canvas/react";
 
 const HERO_WIDTH = 1280;
@@ -49,6 +52,107 @@ type RuntimeMode = {
   tainted: boolean;
 };
 
+type LayerId = "background" | "foreground";
+
+type LayerControlValues = {
+  brightness: number;
+  contrast: number;
+  ditherAmount: number;
+  ditherMatrixSize: NonNullable<DitherConfig["matrixSize"]>;
+  ditherPixelSize: number;
+  opacity: number;
+  revealEdgeDither: number;
+  revealEdgeNoise: number;
+  revealFadeMs: number;
+  revealRadius: number;
+  revealSoftness: number;
+  trailDustSize: number;
+  trailDurationMs: number;
+  trailIdleMs: number;
+  trailSpacing: number;
+  trailStrength: number;
+};
+
+type PlaygroundControls = Record<LayerId, LayerControlValues> & {
+  quality: {
+    resolutionScale: number;
+  };
+};
+
+type SliderDefinition = {
+  group: string;
+  key: keyof LayerControlValues;
+  label: string;
+  max: number;
+  min: number;
+  step: number;
+  unit?: string;
+};
+
+const DEFAULT_LAYER_CONTROLS: Record<LayerId, LayerControlValues> = {
+  background: {
+    brightness: 1.02,
+    contrast: 1.06,
+    ditherAmount: 0.9,
+    ditherMatrixSize: 8,
+    ditherPixelSize: BROWSERBASE_BACKGROUND_PIXEL_SIZE,
+    opacity: 1,
+    revealEdgeDither: BROWSERBASE_REVEAL_EDGE_DITHER,
+    revealEdgeNoise: BROWSERBASE_REVEAL_EDGE_NOISE,
+    revealFadeMs: BROWSERBASE_REVEAL_FADE_MS,
+    revealRadius: 190,
+    revealSoftness: 0.58,
+    trailDustSize: BROWSERBASE_TRAIL_DUST_SIZE,
+    trailDurationMs: BROWSERBASE_TRAIL_DURATION_MS,
+    trailIdleMs: BROWSERBASE_TRAIL_IDLE_MS,
+    trailSpacing: 16,
+    trailStrength: 0.9
+  },
+  foreground: {
+    brightness: 1,
+    contrast: 1.02,
+    ditherAmount: 0,
+    ditherMatrixSize: 8,
+    ditherPixelSize: BROWSERBASE_FOREGROUND_PIXEL_SIZE,
+    opacity: 1,
+    revealEdgeDither: BROWSERBASE_REVEAL_EDGE_DITHER,
+    revealEdgeNoise: BROWSERBASE_REVEAL_EDGE_NOISE,
+    revealFadeMs: BROWSERBASE_REVEAL_FADE_MS,
+    revealRadius: 190,
+    revealSoftness: 0.58,
+    trailDustSize: BROWSERBASE_TRAIL_DUST_SIZE,
+    trailDurationMs: BROWSERBASE_TRAIL_DURATION_MS,
+    trailIdleMs: BROWSERBASE_TRAIL_IDLE_MS,
+    trailSpacing: 16,
+    trailStrength: 0.9
+  }
+};
+
+const DEFAULT_PLAYGROUND_CONTROLS: PlaygroundControls = {
+  ...DEFAULT_LAYER_CONTROLS,
+  quality: {
+    resolutionScale: BROWSERBASE_LOW_RESOLUTION_SCALE
+  }
+};
+
+const LAYER_SLIDERS: SliderDefinition[] = [
+  { group: "Filters", key: "brightness", label: "Brightness", max: 1.35, min: 0.65, step: 0.01 },
+  { group: "Filters", key: "contrast", label: "Contrast", max: 1.6, min: 0.55, step: 0.01 },
+  { group: "Filters", key: "opacity", label: "Opacity", max: 1, min: 0.2, step: 0.01 },
+  { group: "Dither", key: "ditherAmount", label: "Amount", max: 1, min: 0, step: 0.01 },
+  { group: "Dither", key: "ditherPixelSize", label: "Pixel size", max: 12, min: 1, step: 1, unit: "px" },
+  { group: "Reveal shape", key: "revealRadius", label: "Radius", max: 360, min: 40, step: 1, unit: "px" },
+  { group: "Reveal shape", key: "revealSoftness", label: "Softness", max: 0.92, min: 0.05, step: 0.01 },
+  { group: "Reveal shape", key: "revealEdgeDither", label: "Edge dither", max: 1, min: 0, step: 0.01 },
+  { group: "Reveal shape", key: "revealEdgeNoise", label: "Edge noise", max: 1, min: 0, step: 0.01 },
+  { group: "Trail speed", key: "revealFadeMs", label: "Fade", max: 900, min: 0, step: 10, unit: "ms" },
+  { group: "Trail speed", key: "trailDurationMs", label: "Trail life", max: 1600, min: 80, step: 10, unit: "ms" },
+  { group: "Trail speed", key: "trailIdleMs", label: "Idle gap", max: 500, min: 0, step: 10, unit: "ms" },
+  { group: "Trail speed", key: "trailSpacing", label: "Spacing", max: 42, min: 4, step: 1, unit: "px" },
+  { group: "Trail speed", key: "trailDustSize", label: "Dust size", max: 18, min: 1, step: 1, unit: "px" },
+  { group: "Trail speed", key: "trailStrength", label: "Trail strength", max: 1, min: 0, step: 0.01 }
+];
+
 export function TwoLayerHero() {
   const mode = getRuntimeMode();
   const mountainCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -72,16 +176,18 @@ export function TwoLayerHero() {
   const [mountains, setMountains] = useState<ImageData | undefined>();
   const [revealBackground, setRevealBackground] = useState<ImageData | undefined>();
   const [status, setStatus] = useState("Preparing real assets");
+  const [activeLayer, setActiveLayer] = useState<LayerId | undefined>();
+  const [controls, setControls] = useState<PlaygroundControls>(DEFAULT_PLAYGROUND_CONTROLS);
   const idleLayer = useMemo(() => createIdleSurfaceImageData(HERO_WIDTH, HERO_HEIGHT), []);
   const layers = useMemo(
-    () => createHeroLayers(mode.invalid, idleLayer, revealBackground),
-    [idleLayer, mode.invalid, revealBackground]
+    () => createHeroLayers(mode.invalid, idleLayer, revealBackground, controls),
+    [controls, idleLayer, mode.invalid, revealBackground]
   );
   const quality = useMemo<QualityConfig>(() => {
     if (mode.backend === "canvas2d") {
       return {
         backend: "canvas2d",
-        resolutionScale: BROWSERBASE_LOW_RESOLUTION_SCALE,
+        resolutionScale: controls.quality.resolutionScale,
         targetFps: 30
       };
     }
@@ -89,17 +195,35 @@ export function TwoLayerHero() {
     if (mode.backend === "webgl2") {
       return {
         backend: "webgl2",
-        resolutionScale: BROWSERBASE_LOW_RESOLUTION_SCALE,
+        resolutionScale: controls.quality.resolutionScale,
         targetFps: 60
       };
     }
 
     return {
       backend: "auto",
-      resolutionScale: BROWSERBASE_LOW_RESOLUTION_SCALE,
+      resolutionScale: controls.quality.resolutionScale,
       targetFps: 60
     };
-  }, [mode.backend]);
+  }, [controls.quality.resolutionScale, mode.backend]);
+
+  useEffect(() => {
+    if (!activeLayer) {
+      return undefined;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActiveLayer(undefined);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [activeLayer]);
 
   useEffect(() => {
     if (!mode.tainted) {
@@ -235,8 +359,207 @@ export function TwoLayerHero() {
           </div>
         </div>
       </div>
+      <LayerControlPanel
+        activeLayer={activeLayer}
+        controls={controls}
+        onClose={() => setActiveLayer(undefined)}
+        onLayerControlChange={(layer, key, value) => {
+          setControls((current) => ({
+            ...current,
+            [layer]: {
+              ...current[layer],
+              [key]: value
+            }
+          }));
+        }}
+        onMatrixSizeChange={(layer, ditherMatrixSize) => {
+          setControls((current) => ({
+            ...current,
+            [layer]: {
+              ...current[layer],
+              ditherMatrixSize
+            }
+          }));
+        }}
+        onResolutionChange={(resolutionScale) => {
+          setControls((current) => ({
+            ...current,
+            quality: {
+              ...current.quality,
+              resolutionScale
+            }
+          }));
+        }}
+        onSelectLayer={(layer) => {
+          setActiveLayer((current) => (current === layer ? undefined : layer));
+        }}
+      />
     </section>
   );
+}
+
+function LayerControlPanel({
+  activeLayer,
+  controls,
+  onClose,
+  onLayerControlChange,
+  onMatrixSizeChange,
+  onResolutionChange,
+  onSelectLayer
+}: {
+  activeLayer: LayerId | undefined;
+  controls: PlaygroundControls;
+  onClose: () => void;
+  onLayerControlChange: (layer: LayerId, key: keyof LayerControlValues, value: number) => void;
+  onMatrixSizeChange: (layer: LayerId, value: NonNullable<DitherConfig["matrixSize"]>) => void;
+  onResolutionChange: (value: number) => void;
+  onSelectLayer: (layer: LayerId) => void;
+}) {
+  const selectedControls = activeLayer ? controls[activeLayer] : undefined;
+  const sliderGroups = LAYER_SLIDERS.reduce<Record<string, SliderDefinition[]>>((groups, slider) => {
+    groups[slider.group] = [...(groups[slider.group] ?? []), slider];
+
+    return groups;
+  }, {});
+
+  return (
+    <aside className="layer-controls" aria-label="Layer controls">
+      <div className="layer-selector" role="group" aria-label="Choose a layer to tune">
+        {(["background", "foreground"] as const).map((layer) => (
+          <button
+            key={layer}
+            type="button"
+            aria-controls="layer-control-popover"
+            aria-expanded={activeLayer === layer}
+            aria-pressed={activeLayer === layer}
+            className={activeLayer === layer ? "layer-chip is-active" : "layer-chip"}
+            data-testid={`layer-control-${layer}`}
+            onClick={() => onSelectLayer(layer)}
+          >
+            <span>{layer}</span>
+            <strong>{formatControlValue(controls[layer].opacity, 0.01)}</strong>
+          </button>
+        ))}
+      </div>
+
+      {activeLayer && selectedControls ? (
+        <div
+          className="layer-popover"
+          data-testid={`${activeLayer}-layer-popover`}
+          id="layer-control-popover"
+          role="dialog"
+          aria-label={`${activeLayer} layer settings`}
+        >
+          <div className="layer-popover-header">
+            <div>
+              <p>Layer</p>
+              <h2>{activeLayer}</h2>
+            </div>
+            <button
+              type="button"
+              className="layer-close"
+              aria-label="Close layer controls"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
+
+          {Object.entries(sliderGroups).map(([group, sliders]) => (
+            <fieldset key={group} className="control-group">
+              <legend>{group}</legend>
+              {group === "Dither" ? (
+                <div className="matrix-control">
+                  <span>Dither matrix</span>
+                  <div className="matrix-buttons" role="group" aria-label="Dither matrix size">
+                    {([4, 8] as const).map((matrixSize) => (
+                      <button
+                        key={matrixSize}
+                        type="button"
+                        aria-pressed={selectedControls.ditherMatrixSize === matrixSize}
+                        className={
+                          selectedControls.ditherMatrixSize === matrixSize
+                            ? "matrix-button is-active"
+                            : "matrix-button"
+                        }
+                        onClick={() => onMatrixSizeChange(activeLayer, matrixSize)}
+                      >
+                        {matrixSize}x{matrixSize}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {sliders.map((slider) => (
+                <SliderControl
+                  key={slider.key}
+                  layer={activeLayer}
+                  slider={slider}
+                  value={selectedControls[slider.key]}
+                  onChange={onLayerControlChange}
+                />
+              ))}
+            </fieldset>
+          ))}
+
+          <fieldset className="control-group">
+            <legend>Quality</legend>
+            <div className="slider-row">
+              <label htmlFor="layer-quality-resolution">Resolution</label>
+              <span>{formatControlValue(controls.quality.resolutionScale, 0.01)}</span>
+              <input
+                id="layer-quality-resolution"
+                type="range"
+                min={0.2}
+                max={1}
+                step={0.01}
+                value={controls.quality.resolutionScale}
+                data-testid="resolution-scale-slider"
+                onChange={(event) => onResolutionChange(Number(event.currentTarget.value))}
+              />
+            </div>
+          </fieldset>
+        </div>
+      ) : null}
+    </aside>
+  );
+}
+
+function SliderControl({
+  layer,
+  onChange,
+  slider,
+  value
+}: {
+  layer: LayerId;
+  onChange: (layer: LayerId, key: keyof LayerControlValues, value: number) => void;
+  slider: SliderDefinition;
+  value: number;
+}) {
+  const id = `${layer}-${slider.key}-control`;
+
+  return (
+    <div className="slider-row">
+      <label htmlFor={id}>{slider.label}</label>
+      <span>{formatControlValue(value, slider.step, slider.unit)}</span>
+      <input
+        id={id}
+        type="range"
+        min={slider.min}
+        max={slider.max}
+        step={slider.step}
+        value={value}
+        data-testid={`${layer}-${slider.key}-slider`}
+        onChange={(event) => onChange(layer, slider.key, Number(event.currentTarget.value))}
+      />
+    </div>
+  );
+}
+
+function formatControlValue(value: number, step: number, unit = ""): string {
+  const digits = step >= 1 ? 0 : 2;
+
+  return `${value.toFixed(digits)}${unit}`;
 }
 
 function getRuntimeMode(): RuntimeMode {
@@ -253,62 +576,73 @@ function getRuntimeMode(): RuntimeMode {
 function createHeroLayers(
   invalid: boolean,
   idleLayer: ImageData,
-  revealBackground: ImageData | undefined
+  revealBackground: ImageData | undefined,
+  controls: PlaygroundControls
 ): { background: DitheredLayer; foreground: DitheredLayer } {
   return {
     background: {
-      dither: {
-        amount: 0.9,
-        matrixSize: 8,
-        palette: "browserbase",
-        pixelSize: BROWSERBASE_BACKGROUND_PIXEL_SIZE
-      },
+      dither: buildDitherConfig(controls.background),
       fit: invalid ? "cover" : "stretch",
-      filters: [
-        { type: "contrast", amount: 1.06 },
-        { type: "brightness", amount: 1.02 }
-      ],
-      reveal: {
-        edgeDither: BROWSERBASE_REVEAL_EDGE_DITHER,
-        edgeNoise: BROWSERBASE_REVEAL_EDGE_NOISE,
-        fadeMs: BROWSERBASE_REVEAL_FADE_MS,
-        radius: 190,
-        softness: 0.58,
-        strength: 1,
-        trail: {
-          dustSize: BROWSERBASE_TRAIL_DUST_SIZE,
-          durationMs: BROWSERBASE_TRAIL_DURATION_MS,
-          idleMs: BROWSERBASE_TRAIL_IDLE_MS,
-          maxPoints: 32,
-          spacing: 16,
-          strength: 0.9
-        }
-      },
+      filters: buildFilters(controls.background),
+      opacity: controls.background.opacity,
+      reveal: buildRevealConfig(controls.background),
       src: invalid
         ? "/fixtures/missing-background.png"
         : ((revealBackground ?? idleLayer) as unknown as DitheredLayer["src"])
     },
     foreground: {
-      dither: false,
+      dither: buildDitherConfig(controls.foreground),
       fit: "stretch",
-      filters: [{ type: "contrast", amount: 1.02 }],
-      reveal: {
-        edgeDither: BROWSERBASE_REVEAL_EDGE_DITHER,
-        edgeNoise: BROWSERBASE_REVEAL_EDGE_NOISE,
-        fadeMs: BROWSERBASE_REVEAL_FADE_MS,
-        radius: 190,
-        softness: 0.58,
-        strength: 1,
-        trail: {
-          dustSize: BROWSERBASE_TRAIL_DUST_SIZE,
-          durationMs: BROWSERBASE_TRAIL_DURATION_MS,
-          idleMs: BROWSERBASE_TRAIL_IDLE_MS,
-          maxPoints: 32,
-          spacing: 16,
-          strength: 0.9
-        }
-      },
+      filters: buildFilters(controls.foreground),
+      opacity: controls.foreground.opacity,
+      reveal: buildRevealConfig(controls.foreground),
       src: idleLayer as unknown as DitheredLayer["src"]
+    }
+  };
+}
+
+function buildFilters(controls: LayerControlValues): BuiltInFilterConfig[] {
+  const filters: BuiltInFilterConfig[] = [];
+
+  if (controls.contrast !== 1) {
+    filters.push({ type: "contrast", amount: controls.contrast });
+  }
+
+  if (controls.brightness !== 1) {
+    filters.push({ type: "brightness", amount: controls.brightness });
+  }
+
+  return filters;
+}
+
+function buildDitherConfig(controls: LayerControlValues): DitherConfig | false {
+  if (controls.ditherAmount <= 0) {
+    return false;
+  }
+
+  return {
+    amount: controls.ditherAmount,
+    matrixSize: controls.ditherMatrixSize,
+    palette: "browserbase",
+    pixelSize: controls.ditherPixelSize
+  };
+}
+
+function buildRevealConfig(controls: LayerControlValues): RevealInteractionConfig {
+  return {
+    edgeDither: controls.revealEdgeDither,
+    edgeNoise: controls.revealEdgeNoise,
+    fadeMs: controls.revealFadeMs,
+    radius: controls.revealRadius,
+    softness: controls.revealSoftness,
+    strength: 1,
+    trail: {
+      dustSize: controls.trailDustSize,
+      durationMs: controls.trailDurationMs,
+      idleMs: controls.trailIdleMs,
+      maxPoints: 32,
+      spacing: controls.trailSpacing,
+      strength: controls.trailStrength
     }
   };
 }

@@ -151,6 +151,197 @@ body {
   color: #f5f0d8;
 }
 
+.layer-controls {
+  position: absolute;
+  bottom: 24px;
+  right: clamp(16px, 5vw, 72px);
+  z-index: 3;
+  width: min(340px, calc(100vw - 32px));
+  color: #f7f2df;
+  pointer-events: none;
+}
+
+.layer-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(247, 242, 223, 0.28);
+  border-radius: 8px;
+  background: rgba(12, 16, 17, 0.82);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.24);
+  pointer-events: auto;
+}
+
+.layer-chip,
+.matrix-button,
+.layer-close {
+  min-height: 38px;
+  border: 1px solid rgba(247, 242, 223, 0.22);
+  border-radius: 6px;
+  background: rgba(247, 242, 223, 0.08);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.layer-chip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 0 10px;
+  text-align: left;
+  text-transform: capitalize;
+}
+
+.layer-chip strong {
+  color: #ffda18;
+  font-size: 0.76rem;
+}
+
+.layer-chip:hover,
+.matrix-button:hover,
+.layer-close:hover {
+  border-color: rgba(255, 218, 24, 0.72);
+}
+
+.layer-chip:focus-visible,
+.matrix-button:focus-visible,
+.layer-close:focus-visible,
+.slider-row input:focus-visible {
+  outline: 2px solid #77cb2d;
+  outline-offset: 2px;
+}
+
+.layer-chip.is-active,
+.matrix-button.is-active {
+  border-color: #ff3a12;
+  background: #ff3a12;
+  color: #ffffff;
+}
+
+.layer-chip.is-active strong {
+  color: #ffffff;
+}
+
+.layer-popover {
+  max-height: min(520px, calc(100vh - 380px));
+  margin-top: clamp(220px, 26vh, 260px);
+  overflow: auto;
+  border: 1px solid rgba(247, 242, 223, 0.32);
+  border-radius: 8px;
+  background: rgba(11, 15, 16, 0.92);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  pointer-events: auto;
+}
+
+.layer-popover-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid rgba(247, 242, 223, 0.14);
+  background: rgba(11, 15, 16, 0.96);
+}
+
+.layer-popover-header p,
+.layer-popover-header h2 {
+  margin: 0;
+}
+
+.layer-popover-header p {
+  color: rgba(247, 242, 223, 0.62);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.layer-popover-header h2 {
+  color: #ffffff;
+  font-size: 1.02rem;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.layer-close {
+  min-height: 34px;
+  padding: 0 10px;
+  color: rgba(247, 242, 223, 0.86);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.control-group {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 13px 14px 15px;
+  border: 0;
+  border-bottom: 1px solid rgba(247, 242, 223, 0.12);
+}
+
+.control-group:last-child {
+  border-bottom: 0;
+}
+
+.control-group legend {
+  padding: 0;
+  color: #77cb2d;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.slider-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(48px, auto);
+  gap: 7px 10px;
+  align-items: center;
+  color: rgba(247, 242, 223, 0.9);
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.slider-row span {
+  color: #ffda18;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.slider-row input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: #ff3a12;
+}
+
+.matrix-control {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  color: rgba(247, 242, 223, 0.9);
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.matrix-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.matrix-button {
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
 @media (max-width: 720px) {
   .hero-ui {
     padding: 0 16px 32px;
@@ -173,5 +364,18 @@ body {
 
   .hero-copy h1 {
     font-size: clamp(1.9rem, 9vw, 2.6rem);
+  }
+
+  .layer-controls {
+    top: auto;
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    width: auto;
+  }
+
+  .layer-popover {
+    max-height: 52vh;
+    margin-top: 8px;
   }
 }
