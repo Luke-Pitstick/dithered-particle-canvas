@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Playwright tests
+        run: npm run test:e2e
+
+      - name: Build
+        run: npm run build
+
+      - name: Docs example check
+        run: npm run test:docs-example
+
+      - name: Package dry-run
+        run: npm pack --dry-run -w @dithered-particle-canvas/react
+
+      - name: Smoke package consumer
+        run: node scripts/smoke-package-consumer.mjs

@@ -1,0 +1,142 @@
+:root {
+  color: #15161a;
+  background: #eef1ea;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.playground-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, #e9f1ee 0%, #f3efe1 58%, #d9dece 100%);
+}
+
+.hero {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.hero-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #dde9e9;
+}
+
+.hero-ui {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  padding: 26px clamp(20px, 5vw, 72px) 52px;
+  pointer-events: none;
+}
+
+.hero-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #1a2222;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.brand-mark {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgba(20, 26, 28, 0.42);
+  background: rgba(246, 242, 224, 0.58);
+  letter-spacing: 0;
+}
+
+.nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(14px, 3vw, 38px);
+  justify-content: flex-end;
+  text-transform: uppercase;
+}
+
+.hero-copy {
+  align-self: center;
+  max-width: min(850px, 92vw);
+  padding-top: 7vh;
+}
+
+.hero-copy p {
+  margin: 0 0 14px;
+  color: #465f65;
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.hero-copy h1 {
+  max-width: 780px;
+  margin: 0;
+  color: #13171a;
+  font-size: clamp(3rem, 8.3vw, 7.6rem);
+  line-height: 0.93;
+  letter-spacing: 0;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+  color: #161c1e;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.hero-actions span {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  border: 1px solid rgba(20, 26, 28, 0.5);
+  background: rgba(242, 238, 222, 0.7);
+  padding: 0 16px;
+}
+
+@media (max-width: 720px) {
+  .hero-ui {
+    padding: 18px 16px 32px;
+  }
+
+  .nav-links {
+    max-width: 170px;
+    gap: 8px 16px;
+    font-size: 0.72rem;
+  }
+
+  .hero-copy {
+    align-self: end;
+    padding-bottom: 18vh;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(2.5rem, 15vw, 4.5rem);
+  }
+}

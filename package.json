@@ -1,0 +1,35 @@
+{
+  "name": "dithered-particle-canvas",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@10.9.0",
+  "workspaces": [
+    "packages/react",
+    "playground"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev -w playground",
+    "lint": "eslint .",
+    "release:check": "npm run build -w @dithered-particle-canvas/react && npm run test:docs-example && npm pack --dry-run -w @dithered-particle-canvas/react && node scripts/smoke-package-consumer.mjs",
+    "test": "vitest run",
+    "test:docs-example": "tsc -p tests/docs-example/tsconfig.json --noEmit",
+    "test:e2e": "playwright test -c playground/playwright.config.ts",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.1",
+    "eslint": "^9.29.0",
+    "globals": "^15.15.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.0",
+    "vite": "^6.3.5",
+    "vitest": "^4.1.8"
+  }
+}

@@ -1,0 +1,67 @@
+name: Publish Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run npm publish without publishing"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build package
+        run: npm run build -w @dithered-particle-canvas/react
+
+      - name: Docs example check
+        run: npm run test:docs-example
+
+      - name: Package dry-run
+        run: npm pack --dry-run -w @dithered-particle-canvas/react
+
+      - name: Smoke package consumer
+        run: node scripts/smoke-package-consumer.mjs
+
+      - name: Publish dry-run
+        if: ${{ inputs.dry_run == 'true' }}
+        run: npm publish -w @dithered-particle-canvas/react --access public --dry-run
+
+      - name: Publish
+        if: ${{ inputs.dry_run == 'false' }}
+        run: npm publish -w @dithered-particle-canvas/react --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,42 @@
+{
+  "name": "@dithered-particle-canvas/react",
+  "version": "0.0.0",
+  "description": "React component for a two-layer dithered particle canvas reveal.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist/*.d.ts",
+    "dist/*.d.ts.map",
+    "dist/index.js",
+    "dist/index.js.map",
+    "README.md"
+  ],
+  "keywords": [
+    "canvas",
+    "dither",
+    "particles",
+    "react",
+    "webgl"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build && tsc -b tsconfig.build.json --force",
+    "pack:dry-run": "npm pack --dry-run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18 <20"
+  },
+  "devDependencies": {
+    "react": "^19.1.0"
+  }
+}
