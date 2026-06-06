@@ -31,6 +31,7 @@ export type RevealInteractionConfig = {
   strength?: number;
   softness?: number;
   edgeDither?: number;
+  edgeNoise?: number;
   fadeMs?: number;
   trail?: boolean | RevealTrailConfig;
 };

@@ -4,6 +4,7 @@ import {
   BROWSERBASE_REVEAL_PRESET,
   getDitherThreshold,
   getDustThreshold,
+  getEdgeNoise,
   getRevealCompositeMaskAlpha,
   getRevealFade,
   getRevealMaskAlpha
@@ -43,6 +44,70 @@ describe("reveal mask", () => {
 
     expect(alpha).toBeGreaterThan(0);
     expect(alpha).toBeLessThan(1);
+  });
+
+  it("preserves circular softness when edge noise is disabled", () => {
+    const reveal = {
+      ...BROWSERBASE_REVEAL_PRESET,
+      edgeDither: 0,
+      edgeNoise: 0,
+      radius: 10,
+      softness: 0.5
+    };
+    const rightEdgeAlpha = getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, x: 19, y: 10 });
+    const topEdgeAlpha = getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, x: 10, y: 1 });
+
+    expect(rightEdgeAlpha).toBeCloseTo(topEdgeAlpha, 6);
+    expect(rightEdgeAlpha).toBeGreaterThan(0);
+    expect(rightEdgeAlpha).toBeLessThan(1);
+  });
+
+  it("applies deterministic clamped edge noise near the reveal edge", () => {
+    const reveal = {
+      ...BROWSERBASE_REVEAL_PRESET,
+      edgeDither: 0,
+      radius: 10,
+      softness: 0.5
+    };
+    const sample = { pointer: ACTIVE_POINTER, reveal, x: 19, y: 10 };
+
+    expect(getEdgeNoise(19, 10, ACTIVE_POINTER.x, ACTIVE_POINTER.y)).toBe(
+      getEdgeNoise(19, 10, ACTIVE_POINTER.x, ACTIVE_POINTER.y)
+    );
+    expect(getEdgeNoise(19, 10, ACTIVE_POINTER.x, ACTIVE_POINTER.y)).toBeGreaterThanOrEqual(0);
+    expect(getEdgeNoise(19, 10, ACTIVE_POINTER.x, ACTIVE_POINTER.y)).toBeLessThan(1);
+    expect(
+      getRevealMaskAlpha({ ...sample, reveal: { ...reveal, edgeNoise: -1 } })
+    ).toBeCloseTo(getRevealMaskAlpha({ ...sample, reveal: { ...reveal, edgeNoise: 0 } }), 6);
+    expect(
+      getRevealMaskAlpha({ ...sample, reveal: { ...reveal, edgeNoise: 2 } })
+    ).toBeCloseTo(getRevealMaskAlpha({ ...sample, reveal: { ...reveal, edgeNoise: 1 } }), 6);
+  });
+
+  it("lets same-radius near-edge points differ when edge noise is enabled", () => {
+    const reveal = {
+      ...BROWSERBASE_REVEAL_PRESET,
+      edgeDither: 0,
+      edgeNoise: 1,
+      radius: 10,
+      softness: 0.5
+    };
+
+    expect(getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, x: 19, y: 10 })).toBe(0);
+    expect(getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, x: 1, y: 10 })).toBeGreaterThan(0);
+  });
+
+  it("keeps the reveal core full strength with strong edge noise", () => {
+    const reveal = {
+      ...BROWSERBASE_REVEAL_PRESET,
+      edgeDither: 0,
+      edgeNoise: 1,
+      radius: 10,
+      softness: 0.5
+    };
+
+    expect(getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, x: 10, y: 10 })).toBe(1);
+    expect(getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, x: 14, y: 10 })).toBe(1);
   });
 
   it("breaks up the edge with deterministic dither thresholds", () => {

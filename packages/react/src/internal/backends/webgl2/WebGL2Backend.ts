@@ -274,6 +274,7 @@ export class WebGL2Backend implements RenderBackend {
         uniforms: [
           "u_background",
           "u_edgeDither",
+          "u_edgeNoise",
           "u_foreground",
           "u_pointer",
           "u_pointerActive",
@@ -418,6 +419,7 @@ export class WebGL2Backend implements RenderBackend {
     gl.uniform1f(program.uniforms.u_softness, reveal.softness);
     gl.uniform1f(program.uniforms.u_strength, reveal.strength);
     gl.uniform1f(program.uniforms.u_edgeDither, reveal.edgeDither);
+    gl.uniform1f(program.uniforms.u_edgeNoise, reveal.edgeNoise);
     gl.uniform1i(program.uniforms.u_revealLayer, revealLayer === "background" ? 0 : 1);
     gl.uniform1i(program.uniforms.u_trailCount, trail ? trailPoints.length : 0);
     gl.uniform1f(program.uniforms.u_trailStrength, trail ? trail.strength : 0);

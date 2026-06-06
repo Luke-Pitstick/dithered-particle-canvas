@@ -14,6 +14,8 @@ export const DEFAULT_REVEAL_TRAIL: Required<RevealTrailConfig> = {
 };
 
 const DUST_CELL_SIZE = 2;
+const EDGE_NOISE_CELL_SIZE = 18;
+const EDGE_NOISE_MAX_WIDTH_MULTIPLIER = 0.7;
 
 export const REVEAL_DITHER_MATRIX = [
   [0, 8, 2, 10],
@@ -105,16 +107,27 @@ export function getRevealMaskAlpha({
 
   const distance = Math.hypot(x - pointer.x, y - pointer.y);
 
-  if (distance >= radius) {
+  const softness = clamp01(config.softness);
+  const softStart = radius * (1 - softness);
+  const edgeWidth = radius - softStart;
+  const edgeNoise = edgeWidth > 0 ? clamp01(config.edgeNoise) : 0;
+  const outerRadius =
+    edgeNoise > 0 && distance > softStart
+      ? radius +
+        (getEdgeNoise(x, y, pointer.x, pointer.y) - 0.5) *
+          edgeWidth *
+          EDGE_NOISE_MAX_WIDTH_MULTIPLIER *
+          edgeNoise
+      : radius;
+
+  if (distance >= outerRadius) {
     return 0;
   }
 
-  const softness = clamp01(config.softness);
-  const softStart = radius * (1 - softness);
   const radialAlpha =
     distance <= softStart
       ? 1
-      : 1 - smoothstep(softStart, radius, distance);
+      : 1 - smoothstep(softStart, outerRadius, distance);
 
   if (radialAlpha <= 0) {
     return 0;
@@ -178,6 +191,14 @@ export function getDustThreshold(x: number, y: number, seed = 0): number {
   const cellY = Math.floor(y / DUST_CELL_SIZE);
   const value =
     Math.sin(cellX * 12.9898 + cellY * 78.233 + seed * 0.037719) * 43758.5453;
+
+  return value - Math.floor(value);
+}
+
+export function getEdgeNoise(x: number, y: number, originX: number, originY: number): number {
+  const cellX = Math.floor((x - originX) / EDGE_NOISE_CELL_SIZE);
+  const cellY = Math.floor((y - originY) / EDGE_NOISE_CELL_SIZE);
+  const value = Math.sin(cellX * 127.1 + cellY * 311.7) * 43758.5453123;
 
   return value - Math.floor(value);
 }

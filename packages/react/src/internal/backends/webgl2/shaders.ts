@@ -25,6 +25,8 @@ precision mediump float;
 
 const int MAX_TRAIL_POINTS = 32;
 const float DUST_CELL_SIZE = 2.0;
+const float EDGE_NOISE_CELL_SIZE = 18.0;
+const float EDGE_NOISE_MAX_WIDTH_MULTIPLIER = 0.7;
 
 uniform sampler2D u_background;
 uniform sampler2D u_foreground;
@@ -35,6 +37,7 @@ uniform float u_radius;
 uniform float u_softness;
 uniform float u_strength;
 uniform float u_edgeDither;
+uniform float u_edgeNoise;
 uniform int u_revealLayer;
 uniform int u_trailCount;
 uniform vec4 u_trailPoints[MAX_TRAIL_POINTS];
@@ -62,6 +65,11 @@ float dustThreshold(vec2 pixel, float seed) {
   return fract(sin(dot(cell, vec2(12.9898, 78.233)) + seed * 0.037719) * 43758.5453);
 }
 
+float edgeNoise(vec2 pixel, vec2 point) {
+  vec2 cell = floor((pixel - point) / EDGE_NOISE_CELL_SIZE);
+  return fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
 vec4 sourceOver(vec4 destination, vec4 source) {
   float alpha = source.a + destination.a * (1.0 - source.a);
 
@@ -76,12 +84,23 @@ vec4 sourceOver(vec4 destination, vec4 source) {
 float revealMask(vec2 pixel, vec2 point, float fade) {
   float distanceToPointer = distance(pixel, point);
   float softStart = u_radius * (1.0 - clamp(u_softness, 0.0, 1.0));
+  float edgeWidth = u_radius - softStart;
+  float outerRadius = u_radius;
+
+  if (u_edgeNoise > 0.0 && edgeWidth > 0.0 && distanceToPointer > softStart) {
+    outerRadius +=
+      (edgeNoise(pixel, point) - 0.5) *
+      edgeWidth *
+      EDGE_NOISE_MAX_WIDTH_MULTIPLIER *
+      clamp(u_edgeNoise, 0.0, 1.0);
+  }
+
   float mask = 0.0;
 
   if (distanceToPointer <= softStart) {
     mask = 1.0;
-  } else if (distanceToPointer < u_radius) {
-    mask = 1.0 - (distanceToPointer - softStart) / max(1.0, u_radius - softStart);
+  } else if (distanceToPointer < outerRadius) {
+    mask = 1.0 - smoothstep(softStart, outerRadius, distanceToPointer);
   }
 
   if (mask > 0.0 && u_edgeDither > 0.0) {

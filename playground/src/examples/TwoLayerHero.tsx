@@ -262,6 +262,7 @@ function createHeroLayers(
       ],
       reveal: {
         edgeDither: 0.82,
+        edgeNoise: 0.28,
         fadeMs: 520,
         radius: 190,
         softness: 0.5,
@@ -284,6 +285,7 @@ function createHeroLayers(
       filters: [{ type: "contrast", amount: 1.02 }],
       reveal: {
         edgeDither: 0.82,
+        edgeNoise: 0.28,
         fadeMs: 520,
         radius: 190,
         softness: 0.5,
