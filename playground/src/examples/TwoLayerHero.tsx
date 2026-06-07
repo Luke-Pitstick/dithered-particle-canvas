@@ -82,12 +82,15 @@ type LayerControlValues = {
 
 type MountainControlValues = {
   brightness: number;
+  colorMode: MountainColorMode;
   contrast: number;
   colorCount: number;
   hue: number;
   saturation: number;
   warmth: number;
 };
+
+type MountainColorMode = "limited" | "original";
 
 type PlaygroundControls = Record<DitherLayerId, LayerControlValues> & {
   mountains: MountainControlValues;
@@ -107,7 +110,7 @@ type SliderDefinition = {
 };
 
 type MountainSliderDefinition = {
-  key: keyof MountainControlValues;
+  key: keyof Omit<MountainControlValues, "colorMode">;
   label: string;
   max: number;
   min: number;
@@ -164,6 +167,7 @@ const DEFAULT_PLAYGROUND_CONTROLS: PlaygroundControls = {
   ...DEFAULT_LAYER_CONTROLS,
   mountains: {
     brightness: 1,
+    colorMode: "limited",
     contrast: 1,
     colorCount: 5,
     hue: 0,
@@ -449,6 +453,15 @@ export function TwoLayerHero() {
             }
           }));
         }}
+        onMountainColorModeChange={(colorMode) => {
+          setControls((current) => ({
+            ...current,
+            mountains: {
+              ...current.mountains,
+              colorMode
+            }
+          }));
+        }}
         onMatrixSizeChange={(layer, ditherMatrixSize) => {
           setControls((current) => ({
             ...current,
@@ -481,6 +494,7 @@ function LayerControlPanel({
   onClose,
   onLayerControlChange,
   onMountainControlChange,
+  onMountainColorModeChange,
   onMatrixSizeChange,
   onResolutionChange,
   onSelectLayer
@@ -489,7 +503,8 @@ function LayerControlPanel({
   controls: PlaygroundControls;
   onClose: () => void;
   onLayerControlChange: (layer: DitherLayerId, key: keyof LayerControlValues, value: number) => void;
-  onMountainControlChange: (key: keyof MountainControlValues, value: number) => void;
+  onMountainControlChange: (key: keyof Omit<MountainControlValues, "colorMode">, value: number) => void;
+  onMountainColorModeChange: (value: MountainColorMode) => void;
   onMatrixSizeChange: (layer: DitherLayerId, value: NonNullable<DitherConfig["matrixSize"]>) => void;
   onResolutionChange: (value: number) => void;
   onSelectLayer: (layer: LayerId) => void;
@@ -548,6 +563,10 @@ function LayerControlPanel({
           {activeLayer === "mountains" ? (
             <fieldset className="control-group">
               <legend>Mountain color</legend>
+              <MountainColorModeControl
+                value={controls.mountains.colorMode}
+                onChange={onMountainColorModeChange}
+              />
               {MOUNTAIN_SLIDERS.map((slider) => (
                 <MountainSliderControl
                   key={slider.key}
@@ -650,12 +669,40 @@ function SliderControl({
   );
 }
 
+function MountainColorModeControl({
+  onChange,
+  value
+}: {
+  onChange: (value: MountainColorMode) => void;
+  value: MountainColorMode;
+}) {
+  return (
+    <div className="matrix-control" data-testid="mountains-color-mode-control">
+      <span>Color mode</span>
+      <div className="matrix-buttons" role="group" aria-label="Mountain color mode">
+        {(["limited", "original"] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            aria-pressed={value === mode}
+            className={value === mode ? "matrix-button is-active" : "matrix-button"}
+            data-testid={`mountains-color-mode-${mode}`}
+            onClick={() => onChange(mode)}
+          >
+            {mode === "limited" ? "Limited" : "Original"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MountainSliderControl({
   onChange,
   slider,
   value
 }: {
-  onChange: (key: keyof MountainControlValues, value: number) => void;
+  onChange: (key: keyof Omit<MountainControlValues, "colorMode">, value: number) => void;
   slider: MountainSliderDefinition;
   value: number;
 }) {
@@ -794,7 +841,9 @@ function applyMountainColorFilters(source: ImageData, controls: MountainControlV
   const output = new ImageData(new Uint8ClampedArray(source.data), source.width, source.height);
   const hueShift = controls.hue / 360;
 
-  applyMountainPalette(output, controls.colorCount);
+  if (controls.colorMode === "limited") {
+    applyMountainPalette(output, controls.colorCount);
+  }
 
   for (let index = 0; index < output.data.length; index += 4) {
     const alpha = output.data[index + 3] ?? 0;

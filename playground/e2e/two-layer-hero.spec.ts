@@ -51,6 +51,9 @@ test("layer control sliders update live playground config", async ({ page }) => 
   const beforeMountains = await samplePageGrid(page, 0.2, 0.82, 0.08, 0.04, 7, 5);
   await page.getByTestId("layer-control-mountains").click();
   await expect(page.getByTestId("mountains-layer-popover")).toBeVisible();
+  await expect(page.getByTestId("mountains-color-mode-control")).toBeVisible();
+  await expect(page.getByTestId("mountains-color-mode-limited")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("mountains-color-mode-original")).toHaveAttribute("aria-pressed", "false");
   await setSliderValue(page, "mountains-colorCount-slider", 8);
   await setSliderValue(page, "mountains-hue-slider", 70);
   await setSliderValue(page, "mountains-saturation-slider", 0.35);
@@ -60,6 +63,19 @@ test("layer control sliders update live playground config", async ({ page }) => 
 
       return Math.max(
         ...afterMountains.map((pixel, index) => colorDistance(pixel, beforeMountains[index]!))
+      );
+    })
+    .toBeGreaterThan(20);
+  const limitedMountains = await samplePageGrid(page, 0.2, 0.82, 0.08, 0.04, 7, 5);
+  await page.getByTestId("mountains-color-mode-original").click();
+  await expect(page.getByTestId("mountains-color-mode-limited")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("mountains-color-mode-original")).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(async () => {
+      const originalMountains = await samplePageGrid(page, 0.2, 0.82, 0.08, 0.04, 7, 5);
+
+      return Math.max(
+        ...originalMountains.map((pixel, index) => colorDistance(pixel, limitedMountains[index]!))
       );
     })
     .toBeGreaterThan(20);
