@@ -8,5 +8,6 @@ export type {
   DitheredParticleCanvasProps,
   LayerSource,
   QualityConfig,
-  RevealInteractionConfig
+  RevealInteractionConfig,
+  RevealTrailConfig
 } from "./types";

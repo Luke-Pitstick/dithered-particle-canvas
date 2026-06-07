@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { DitheredParticleCanvas, useDitheredCanvas } from "./index";
-import type { DitheredCanvasHandle, DitheredParticleCanvasProps } from "./index";
+import type {
+  DitheredCanvasHandle,
+  DitheredParticleCanvasProps,
+  RevealTrailConfig
+} from "./index";
 
 describe("public React package scaffold", () => {
   it("exports the component and hook stubs", () => {
@@ -76,9 +80,15 @@ describe("public React package scaffold", () => {
       pause: () => undefined,
       resume: () => undefined
     };
+    const trail = {
+      dustFlicker: 0.4,
+      dustSize: 6,
+      durationMs: 900
+    } satisfies RevealTrailConfig;
 
     expect(helloWorld.revealLayer).toBe("background");
     expect(advanced.layers.background.src).toBe("/mountains.gif");
+    expect(trail.dustSize).toBe(6);
     expect(handle).toHaveProperty("exportFrame");
   });
 });
