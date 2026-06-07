@@ -125,9 +125,12 @@ export type RendererQuality = QualityConfig;
 
 export const DEFAULT_REVEAL: Required<RevealInteractionConfig> = {
   edgeDither: 0.55,
+  edgeFlicker: 0,
   edgeNoise: 0,
   fadeMs: 450,
+  foregroundBlend: 1,
   mode: "reveal",
+  pixelSize: 1,
   radius: 150,
   softness: 0.35,
   strength: 1,

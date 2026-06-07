@@ -18,6 +18,7 @@ export type BuiltInFilterConfig =
   | { type: "opacity"; amount: number };
 
 export type RevealTrailConfig = {
+  dustFlicker?: number;
   dustSize?: number;
   durationMs?: number;
   idleMs?: number;
@@ -32,7 +33,10 @@ export type RevealInteractionConfig = {
   strength?: number;
   softness?: number;
   edgeDither?: number;
+  edgeFlicker?: number;
   edgeNoise?: number;
+  foregroundBlend?: number;
+  pixelSize?: number;
   fadeMs?: number;
   trail?: boolean | RevealTrailConfig;
 };

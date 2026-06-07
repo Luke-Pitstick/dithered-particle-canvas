@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { RevealInteractionConfig } from "../../types";
 import type { PointerSnapshot } from "../renderer/types";
 import {
   BROWSERBASE_REVEAL_PRESET,
@@ -204,6 +205,126 @@ describe("reveal mask", () => {
     expect(getDustThreshold(8, 8, seed, 0)).toBe(getDustThreshold(8, 8, seed, 1));
   });
 
+  it("uses reveal pixel size to group cursor edge samples into larger cells", () => {
+    const reveal = {
+      ...BROWSERBASE_REVEAL_PRESET,
+      edgeDither: 0,
+      pixelSize: 4,
+      radius: 10,
+      softness: 1
+    };
+
+    expect(getDitherThreshold(16, 8, 4)).toBe(getDitherThreshold(19, 11, 4));
+    expect(getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, x: 17, y: 10 })).toBe(
+      getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, x: 19, y: 11 })
+    );
+  });
+
+  it("keeps pixelated reveal edge dropout stable by default but lets it fluctuate", () => {
+    const stableReveal = {
+      ...BROWSERBASE_REVEAL_PRESET,
+      edgeDither: 1,
+      edgeFlicker: 0,
+      pixelSize: 4,
+      radius: 12,
+      softness: 1
+    };
+    const flickeringReveal = {
+      ...stableReveal,
+      edgeFlicker: 1
+    };
+    const flickeringPixel = findFlickeringRevealEdgePixel(flickeringReveal, 0, 96);
+    const baseSample = {
+      pointer: ACTIVE_POINTER,
+      x: flickeringPixel.x,
+      y: flickeringPixel.y
+    };
+
+    expect(
+      getRevealMaskAlpha({
+        ...baseSample,
+        reveal: stableReveal,
+        time: 0
+      })
+    ).toBe(
+      getRevealMaskAlpha({
+        ...baseSample,
+        reveal: stableReveal,
+        time: 960
+      })
+    );
+    expect(
+      getRevealMaskAlpha({
+        ...baseSample,
+        reveal: flickeringReveal,
+        time: 0
+      })
+    ).not.toBe(
+      getRevealMaskAlpha({
+        ...baseSample,
+        reveal: flickeringReveal,
+        time: 96
+      })
+    );
+  });
+
+  it("keeps trail dust static by default but lets it fluctuate when configured", () => {
+    const trailPoint = { fade: 0.5, x: 30, y: 30 };
+    const stableReveal = {
+      ...BROWSERBASE_REVEAL_PRESET,
+      edgeDither: 0,
+      radius: 10,
+      trail: {
+        dustFlicker: 0,
+        durationMs: 900,
+        strength: 0.5
+      }
+    };
+    const flickeringReveal = {
+      ...stableReveal,
+      trail: {
+        ...stableReveal.trail,
+        dustFlicker: 1
+      }
+    };
+    const flickeringPixel = findFlickeringDustPixel(flickeringReveal, trailPoint, 0, 96);
+    const baseSample = {
+      pointer: {
+        ...ACTIVE_POINTER,
+        trail: [trailPoint]
+      },
+      x: flickeringPixel.x,
+      y: flickeringPixel.y
+    };
+
+    expect(
+      getRevealCompositeMaskAlpha({
+        ...baseSample,
+        reveal: stableReveal,
+        time: 0
+      })
+    ).toBe(
+      getRevealCompositeMaskAlpha({
+        ...baseSample,
+        reveal: stableReveal,
+        time: 960
+      })
+    );
+    expect(
+      getRevealCompositeMaskAlpha({
+        ...baseSample,
+        reveal: flickeringReveal,
+        time: 0
+      })
+    ).not.toBe(
+      getRevealCompositeMaskAlpha({
+        ...baseSample,
+        reveal: flickeringReveal,
+        time: 96
+      })
+    );
+  });
+
   it("fades out after pointer leave and clears immediately for reduced motion", () => {
     expect(getRevealFade({ active: true, elapsedSinceInactiveMs: 999 })).toBe(1);
     expect(getRevealFade({ active: false, elapsedSinceInactiveMs: 225, fadeMs: 450 })).toBe(0.5);
@@ -233,4 +354,52 @@ function findNearbyDustPixel(
   }
 
   throw new Error("Expected to find a nearby dust pixel for the test threshold.");
+}
+
+function findFlickeringDustPixel(
+  reveal: RevealInteractionConfig,
+  trailPoint: { fade: number; x: number; y: number },
+  timeA: number,
+  timeB: number
+): { x: number; y: number } {
+  const pointer = {
+    ...ACTIVE_POINTER,
+    trail: [trailPoint]
+  };
+
+  for (let y = 24; y <= 36; y += 1) {
+    for (let x = 24; x <= 36; x += 1) {
+      if (Math.hypot(x - trailPoint.x, y - trailPoint.y) >= 10) {
+        continue;
+      }
+
+      const first = getRevealCompositeMaskAlpha({ pointer, reveal, time: timeA, x, y });
+      const second = getRevealCompositeMaskAlpha({ pointer, reveal, time: timeB, x, y });
+
+      if (first !== second) {
+        return { x, y };
+      }
+    }
+  }
+
+  throw new Error("Expected to find a nearby dust pixel whose mask fluctuates over time.");
+}
+
+function findFlickeringRevealEdgePixel(
+  reveal: RevealInteractionConfig,
+  timeA: number,
+  timeB: number
+): { x: number; y: number } {
+  for (let y = 0; y <= 22; y += 1) {
+    for (let x = 0; x <= 22; x += 1) {
+      const first = getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, time: timeA, x, y });
+      const second = getRevealMaskAlpha({ pointer: ACTIVE_POINTER, reveal, time: timeB, x, y });
+
+      if (first !== second) {
+        return { x, y };
+      }
+    }
+  }
+
+  throw new Error("Expected to find a reveal edge pixel whose dither mask fluctuates over time.");
 }

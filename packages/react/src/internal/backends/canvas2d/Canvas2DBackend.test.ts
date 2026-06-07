@@ -145,6 +145,57 @@ describe("Canvas2DBackend oracle", () => {
 
     expect(getPixel(output, 1, 1)).toEqual([255, 0, 0, 255]);
   });
+
+  it("can partially blend background reveals over opaque foreground pixels", () => {
+    const backend = new Canvas2DBackend();
+    backend.resize({ height: 1, width: 1 });
+
+    const background = normalizeLayer(
+      "background",
+      {
+        dither: false,
+        fit: "stretch",
+        src: "fixture-background"
+      },
+      {
+        height: 1,
+        imageData: createImageData(1, 1, new Uint8ClampedArray([255, 0, 0, 255])),
+        kind: "image-data",
+        width: 1
+      }
+    );
+    const foreground = normalizeLayer(
+      "foreground",
+      {
+        dither: false,
+        fit: "stretch",
+        reveal: {
+          edgeDither: 0,
+          foregroundBlend: 0.25,
+          radius: 2,
+          softness: 0
+        },
+        src: "fixture-foreground"
+      },
+      {
+        height: 1,
+        imageData: createImageData(1, 1, new Uint8ClampedArray([0, 0, 255, 255])),
+        kind: "image-data",
+        width: 1
+      }
+    );
+
+    backend.setPointer({
+      active: true,
+      fade: 1,
+      x: 0,
+      y: 0
+    });
+
+    const output = backend.renderToImageData({ background, foreground });
+
+    expect(getPixel(output, 0, 0)).toEqual([64, 0, 191, 255]);
+  });
 });
 
 function createSolidImageData(

@@ -274,16 +274,21 @@ export class WebGL2Backend implements RenderBackend {
         uniforms: [
           "u_background",
           "u_edgeDither",
+          "u_edgeFlicker",
           "u_edgeNoise",
+          "u_foregroundBlend",
           "u_foreground",
           "u_pointer",
           "u_pointerActive",
           "u_pointerFade",
           "u_radius",
+          "u_revealPixelSize",
           "u_revealLayer",
           "u_softness",
           "u_strength",
+          "u_time",
           "u_trailCount",
+          "u_trailDustFlicker",
           "u_trailDustSize",
           "u_trailPoints",
           "u_trailStrength"
@@ -419,10 +424,18 @@ export class WebGL2Backend implements RenderBackend {
     gl.uniform1f(program.uniforms.u_radius, reveal.radius);
     gl.uniform1f(program.uniforms.u_softness, reveal.softness);
     gl.uniform1f(program.uniforms.u_strength, reveal.strength);
+    gl.uniform1f(program.uniforms.u_time, frame.time);
     gl.uniform1f(program.uniforms.u_edgeDither, reveal.edgeDither);
+    gl.uniform1f(program.uniforms.u_edgeFlicker, Math.max(0, Math.min(1, reveal.edgeFlicker)));
     gl.uniform1f(program.uniforms.u_edgeNoise, reveal.edgeNoise);
+    gl.uniform1f(program.uniforms.u_foregroundBlend, reveal.foregroundBlend);
+    gl.uniform1f(program.uniforms.u_revealPixelSize, Math.max(1, Math.round(reveal.pixelSize)));
     gl.uniform1i(program.uniforms.u_revealLayer, revealLayer === "background" ? 0 : 1);
     gl.uniform1i(program.uniforms.u_trailCount, trail ? trailPoints.length : 0);
+    gl.uniform1f(
+      program.uniforms.u_trailDustFlicker,
+      trail ? Math.max(0, Math.min(1, trail.dustFlicker)) : 0
+    );
     gl.uniform1f(program.uniforms.u_trailDustSize, trail ? Math.max(1, trail.dustSize) : 1);
     gl.uniform1f(program.uniforms.u_trailStrength, trail ? trail.strength : 0);
 

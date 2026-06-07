@@ -192,9 +192,13 @@ type RevealInteractionConfig = {
   strength?: number;
   softness?: number;
   edgeDither?: number;
+  edgeFlicker?: number;
   edgeNoise?: number;
+  foregroundBlend?: number;
+  pixelSize?: number;
   fadeMs?: number;
   trail?: boolean | {
+    dustFlicker?: number;
     dustSize?: number;
     durationMs?: number;
     idleMs?: number;
@@ -205,11 +209,11 @@ type RevealInteractionConfig = {
 };
 ```
 
-Defaults are tuned for a soft reveal with a dithered, broken-up edge. `radius` controls the reveal size, `strength` controls blend intensity, `softness` controls falloff, `edgeDither` controls fragmented pixel dropout around the edge, `edgeNoise` controls deterministic non-round radius variation in the soft edge, and `fadeMs` controls how long the solid reveal fades after pointer leave when trail is disabled.
+Defaults are tuned for a soft reveal with a dithered, broken-up edge. `radius` controls the reveal size, `strength` controls blend intensity, `softness` controls falloff, `edgeDither` controls fragmented pixel dropout around the edge, `edgeFlicker` controls how much that pixel dropout re-seeds while the cursor moves, `edgeNoise` controls deterministic non-round radius variation in the soft edge, `foregroundBlend` controls how strongly a background reveal washes over opaque foreground pixels, `pixelSize` groups reveal edge sampling into larger blocks, and `fadeMs` controls how long the solid reveal fades after pointer leave when trail is disabled.
 
 `edgeNoise` defaults to `0`, which preserves the circular mask. Values are clamped to `0..1`; subtle Browserbase-style edges usually sit around `0.2..0.35`. The stable core remains circular and full-strength, while only the soft outer band varies.
 
-Set `trail` to leave a bounded afterimage behind pointer movement. `dustSize` controls the dust particle cell size in backing-store pixels, `durationMs` controls how long each stamp remains, `idleMs` controls how quickly an in-bounds stopped cursor dissolves into dust, `maxPoints` caps the work per frame, `spacing` avoids oversampling tiny pointer moves, and `strength` controls how intense old stamps are. When `trail` is enabled and the pointer leaves or idles past `idleMs`, the solid reveal clears and the visible disappearance is controlled by trail dust.
+Set `trail` to leave a bounded afterimage behind pointer movement. `dustFlicker` controls how much the dust particle pattern re-seeds while fading, `dustSize` controls the dust particle cell size in backing-store pixels, `durationMs` controls how long each stamp remains, `idleMs` controls how quickly an in-bounds stopped cursor dissolves into dust, `maxPoints` caps the work per frame, `spacing` avoids oversampling tiny pointer moves, and `strength` controls how intense old stamps are. When `trail` is enabled and the pointer leaves or idles past `idleMs`, the solid reveal clears and the visible disappearance is controlled by trail dust.
 
 Fast snap-away reveal:
 
@@ -224,8 +228,12 @@ Lingering Browserbase-style dust:
 
 ```tsx
 reveal={{
+  edgeDither: 0.94,
+  edgeFlicker: 0.7,
+  pixelSize: 6,
   fadeMs: 520,
   trail: {
+    dustFlicker: 0.7,
     dustSize: 6,
     durationMs: 1600,
     idleMs: 360,

@@ -17,8 +17,11 @@ const BROWSERBASE_BACKGROUND_PIXEL_SIZE = 4;
 const BROWSERBASE_FOREGROUND_PIXEL_SIZE = 6;
 const BROWSERBASE_REVEAL_EDGE_NOISE = 0.56;
 const BROWSERBASE_REVEAL_EDGE_DITHER = 0.94;
+const BROWSERBASE_REVEAL_EDGE_FLICKER = 0.78;
+const BROWSERBASE_REVEAL_FOREGROUND_BLEND = 0.32;
 const BROWSERBASE_REVEAL_FADE_MS = 220;
 const BROWSERBASE_TRAIL_DURATION_MS = 720;
+const BROWSERBASE_TRAIL_DUST_FLICKER = 0.72;
 const BROWSERBASE_TRAIL_DUST_SIZE = 6;
 const BROWSERBASE_TRAIL_IDLE_MS = 120;
 const BACKGROUND_REVEAL_SRC = "/background.jpg";
@@ -52,7 +55,8 @@ type RuntimeMode = {
   tainted: boolean;
 };
 
-type LayerId = "background" | "foreground";
+type DitherLayerId = "background" | "foreground";
+type LayerId = DitherLayerId | "mountains";
 
 type LayerControlValues = {
   brightness: number;
@@ -62,10 +66,13 @@ type LayerControlValues = {
   ditherPixelSize: number;
   opacity: number;
   revealEdgeDither: number;
+  revealEdgeFlicker: number;
   revealEdgeNoise: number;
   revealFadeMs: number;
+  revealPixelSize: number;
   revealRadius: number;
   revealSoftness: number;
+  trailDustFlicker: number;
   trailDustSize: number;
   trailDurationMs: number;
   trailIdleMs: number;
@@ -73,7 +80,17 @@ type LayerControlValues = {
   trailStrength: number;
 };
 
-type PlaygroundControls = Record<LayerId, LayerControlValues> & {
+type MountainControlValues = {
+  brightness: number;
+  contrast: number;
+  colorCount: number;
+  hue: number;
+  saturation: number;
+  warmth: number;
+};
+
+type PlaygroundControls = Record<DitherLayerId, LayerControlValues> & {
+  mountains: MountainControlValues;
   quality: {
     resolutionScale: number;
   };
@@ -89,7 +106,16 @@ type SliderDefinition = {
   unit?: string;
 };
 
-const DEFAULT_LAYER_CONTROLS: Record<LayerId, LayerControlValues> = {
+type MountainSliderDefinition = {
+  key: keyof MountainControlValues;
+  label: string;
+  max: number;
+  min: number;
+  step: number;
+  unit?: string;
+};
+
+const DEFAULT_LAYER_CONTROLS: Record<DitherLayerId, LayerControlValues> = {
   background: {
     brightness: 1.02,
     contrast: 1.06,
@@ -98,10 +124,13 @@ const DEFAULT_LAYER_CONTROLS: Record<LayerId, LayerControlValues> = {
     ditherPixelSize: BROWSERBASE_BACKGROUND_PIXEL_SIZE,
     opacity: 1,
     revealEdgeDither: BROWSERBASE_REVEAL_EDGE_DITHER,
+    revealEdgeFlicker: BROWSERBASE_REVEAL_EDGE_FLICKER,
     revealEdgeNoise: BROWSERBASE_REVEAL_EDGE_NOISE,
     revealFadeMs: BROWSERBASE_REVEAL_FADE_MS,
+    revealPixelSize: BROWSERBASE_FOREGROUND_PIXEL_SIZE,
     revealRadius: 190,
     revealSoftness: 0.58,
+    trailDustFlicker: BROWSERBASE_TRAIL_DUST_FLICKER,
     trailDustSize: BROWSERBASE_TRAIL_DUST_SIZE,
     trailDurationMs: BROWSERBASE_TRAIL_DURATION_MS,
     trailIdleMs: BROWSERBASE_TRAIL_IDLE_MS,
@@ -116,10 +145,13 @@ const DEFAULT_LAYER_CONTROLS: Record<LayerId, LayerControlValues> = {
     ditherPixelSize: BROWSERBASE_FOREGROUND_PIXEL_SIZE,
     opacity: 1,
     revealEdgeDither: BROWSERBASE_REVEAL_EDGE_DITHER,
+    revealEdgeFlicker: BROWSERBASE_REVEAL_EDGE_FLICKER,
     revealEdgeNoise: BROWSERBASE_REVEAL_EDGE_NOISE,
     revealFadeMs: BROWSERBASE_REVEAL_FADE_MS,
+    revealPixelSize: BROWSERBASE_FOREGROUND_PIXEL_SIZE,
     revealRadius: 190,
     revealSoftness: 0.58,
+    trailDustFlicker: BROWSERBASE_TRAIL_DUST_FLICKER,
     trailDustSize: BROWSERBASE_TRAIL_DUST_SIZE,
     trailDurationMs: BROWSERBASE_TRAIL_DURATION_MS,
     trailIdleMs: BROWSERBASE_TRAIL_IDLE_MS,
@@ -130,6 +162,14 @@ const DEFAULT_LAYER_CONTROLS: Record<LayerId, LayerControlValues> = {
 
 const DEFAULT_PLAYGROUND_CONTROLS: PlaygroundControls = {
   ...DEFAULT_LAYER_CONTROLS,
+  mountains: {
+    brightness: 1,
+    contrast: 1,
+    colorCount: 5,
+    hue: 0,
+    saturation: 1,
+    warmth: 0
+  },
   quality: {
     resolutionScale: BROWSERBASE_LOW_RESOLUTION_SCALE
   }
@@ -153,6 +193,15 @@ const LAYER_SLIDERS: SliderDefinition[] = [
   { group: "Trail speed", key: "trailStrength", label: "Trail strength", max: 1, min: 0, step: 0.01 }
 ];
 
+const MOUNTAIN_SLIDERS: MountainSliderDefinition[] = [
+  { key: "colorCount", label: "Color count", max: 12, min: 2, step: 1 },
+  { key: "brightness", label: "Brightness", max: 1.45, min: 0.55, step: 0.01 },
+  { key: "contrast", label: "Contrast", max: 1.75, min: 0.55, step: 0.01 },
+  { key: "saturation", label: "Saturation", max: 2, min: 0, step: 0.01 },
+  { key: "hue", label: "Hue shift", max: 90, min: -90, step: 1, unit: "deg" },
+  { key: "warmth", label: "Warmth", max: 1, min: -1, step: 0.01 }
+];
+
 export function TwoLayerHero() {
   const mode = getRuntimeMode();
   const mountainCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -173,7 +222,7 @@ export function TwoLayerHero() {
   });
   window.__dpcPlayground = diagnostics.current;
 
-  const [mountains, setMountains] = useState<ImageData | undefined>();
+  const [mountainBase, setMountainBase] = useState<ImageData | undefined>();
   const [revealBackground, setRevealBackground] = useState<ImageData | undefined>();
   const [status, setStatus] = useState("Preparing real assets");
   const [activeLayer, setActiveLayer] = useState<LayerId | undefined>();
@@ -182,6 +231,10 @@ export function TwoLayerHero() {
   const layers = useMemo(
     () => createHeroLayers(mode.invalid, idleLayer, revealBackground, controls),
     [controls, idleLayer, mode.invalid, revealBackground]
+  );
+  const mountains = useMemo(
+    () => (mountainBase ? applyMountainColorFilters(mountainBase, controls.mountains) : undefined),
+    [controls.mountains, mountainBase]
   );
   const quality = useMemo<QualityConfig>(() => {
     if (mode.backend === "canvas2d") {
@@ -276,7 +329,7 @@ export function TwoLayerHero() {
     loadMattedMountainForeground(FOREGROUND_MOUNTAINS_SRC, HERO_WIDTH, HERO_HEIGHT)
       .then((imageData) => {
         if (!cancelled) {
-          setMountains(imageData);
+          setMountainBase(imageData);
         }
       })
       .catch((error: unknown) => {
@@ -364,10 +417,34 @@ export function TwoLayerHero() {
         controls={controls}
         onClose={() => setActiveLayer(undefined)}
         onLayerControlChange={(layer, key, value) => {
+          if (key === "ditherPixelSize") {
+            setControls((current) => ({
+              ...current,
+              background: {
+                ...current.background,
+                ditherPixelSize: value
+              },
+              foreground: {
+                ...current.foreground,
+                ditherPixelSize: value
+              }
+            }));
+            return;
+          }
+
           setControls((current) => ({
             ...current,
             [layer]: {
               ...current[layer],
+              [key]: value
+            }
+          }));
+        }}
+        onMountainControlChange={(key, value) => {
+          setControls((current) => ({
+            ...current,
+            mountains: {
+              ...current.mountains,
               [key]: value
             }
           }));
@@ -403,6 +480,7 @@ function LayerControlPanel({
   controls,
   onClose,
   onLayerControlChange,
+  onMountainControlChange,
   onMatrixSizeChange,
   onResolutionChange,
   onSelectLayer
@@ -410,12 +488,14 @@ function LayerControlPanel({
   activeLayer: LayerId | undefined;
   controls: PlaygroundControls;
   onClose: () => void;
-  onLayerControlChange: (layer: LayerId, key: keyof LayerControlValues, value: number) => void;
-  onMatrixSizeChange: (layer: LayerId, value: NonNullable<DitherConfig["matrixSize"]>) => void;
+  onLayerControlChange: (layer: DitherLayerId, key: keyof LayerControlValues, value: number) => void;
+  onMountainControlChange: (key: keyof MountainControlValues, value: number) => void;
+  onMatrixSizeChange: (layer: DitherLayerId, value: NonNullable<DitherConfig["matrixSize"]>) => void;
   onResolutionChange: (value: number) => void;
   onSelectLayer: (layer: LayerId) => void;
 }) {
-  const selectedControls = activeLayer ? controls[activeLayer] : undefined;
+  const selectedControls =
+    activeLayer === "background" || activeLayer === "foreground" ? controls[activeLayer] : undefined;
   const sliderGroups = LAYER_SLIDERS.reduce<Record<string, SliderDefinition[]>>((groups, slider) => {
     groups[slider.group] = [...(groups[slider.group] ?? []), slider];
 
@@ -425,7 +505,7 @@ function LayerControlPanel({
   return (
     <aside className="layer-controls" aria-label="Layer controls">
       <div className="layer-selector" role="group" aria-label="Choose a layer to tune">
-        {(["background", "foreground"] as const).map((layer) => (
+        {(["background", "foreground", "mountains"] as const).map((layer) => (
           <button
             key={layer}
             type="button"
@@ -436,24 +516,24 @@ function LayerControlPanel({
             data-testid={`layer-control-${layer}`}
             onClick={() => onSelectLayer(layer)}
           >
-            <span>{layer}</span>
-            <strong>{formatControlValue(controls[layer].opacity, 0.01)}</strong>
+            <span>{getLayerLabel(layer)}</span>
+            <strong>{getLayerChipValue(layer, controls)}</strong>
           </button>
         ))}
       </div>
 
-      {activeLayer && selectedControls ? (
+      {activeLayer ? (
         <div
           className="layer-popover"
           data-testid={`${activeLayer}-layer-popover`}
           id="layer-control-popover"
           role="dialog"
-          aria-label={`${activeLayer} layer settings`}
+          aria-label={`${getLayerLabel(activeLayer)} layer settings`}
         >
           <div className="layer-popover-header">
             <div>
               <p>Layer</p>
-              <h2>{activeLayer}</h2>
+              <h2>{getLayerLabel(activeLayer)}</h2>
             </div>
             <button
               type="button"
@@ -465,42 +545,56 @@ function LayerControlPanel({
             </button>
           </div>
 
-          {Object.entries(sliderGroups).map(([group, sliders]) => (
-            <fieldset key={group} className="control-group">
-              <legend>{group}</legend>
-              {group === "Dither" ? (
-                <div className="matrix-control">
-                  <span>Dither matrix</span>
-                  <div className="matrix-buttons" role="group" aria-label="Dither matrix size">
-                    {([4, 8] as const).map((matrixSize) => (
-                      <button
-                        key={matrixSize}
-                        type="button"
-                        aria-pressed={selectedControls.ditherMatrixSize === matrixSize}
-                        className={
-                          selectedControls.ditherMatrixSize === matrixSize
-                            ? "matrix-button is-active"
-                            : "matrix-button"
-                        }
-                        onClick={() => onMatrixSizeChange(activeLayer, matrixSize)}
-                      >
-                        {matrixSize}x{matrixSize}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {sliders.map((slider) => (
-                <SliderControl
+          {activeLayer === "mountains" ? (
+            <fieldset className="control-group">
+              <legend>Mountain color</legend>
+              {MOUNTAIN_SLIDERS.map((slider) => (
+                <MountainSliderControl
                   key={slider.key}
-                  layer={activeLayer}
                   slider={slider}
-                  value={selectedControls[slider.key]}
-                  onChange={onLayerControlChange}
+                  value={controls.mountains[slider.key]}
+                  onChange={onMountainControlChange}
                 />
               ))}
             </fieldset>
-          ))}
+          ) : selectedControls ? (
+            Object.entries(sliderGroups).map(([group, sliders]) => (
+              <fieldset key={group} className="control-group">
+                <legend>{group}</legend>
+                {group === "Dither" ? (
+                  <div className="matrix-control">
+                    <span>Dither matrix</span>
+                    <div className="matrix-buttons" role="group" aria-label="Dither matrix size">
+                      {([4, 8] as const).map((matrixSize) => (
+                        <button
+                          key={matrixSize}
+                          type="button"
+                          aria-pressed={selectedControls.ditherMatrixSize === matrixSize}
+                          className={
+                            selectedControls.ditherMatrixSize === matrixSize
+                              ? "matrix-button is-active"
+                              : "matrix-button"
+                          }
+                          onClick={() => onMatrixSizeChange(activeLayer, matrixSize)}
+                        >
+                          {matrixSize}x{matrixSize}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {sliders.map((slider) => (
+                  <SliderControl
+                    key={slider.key}
+                    layer={activeLayer}
+                    slider={slider}
+                    value={selectedControls[slider.key]}
+                    onChange={onLayerControlChange}
+                  />
+                ))}
+              </fieldset>
+            ))
+          ) : null}
 
           <fieldset className="control-group">
             <legend>Quality</legend>
@@ -531,8 +625,8 @@ function SliderControl({
   slider,
   value
 }: {
-  layer: LayerId;
-  onChange: (layer: LayerId, key: keyof LayerControlValues, value: number) => void;
+  layer: DitherLayerId;
+  onChange: (layer: DitherLayerId, key: keyof LayerControlValues, value: number) => void;
   slider: SliderDefinition;
   value: number;
 }) {
@@ -554,6 +648,51 @@ function SliderControl({
       />
     </div>
   );
+}
+
+function MountainSliderControl({
+  onChange,
+  slider,
+  value
+}: {
+  onChange: (key: keyof MountainControlValues, value: number) => void;
+  slider: MountainSliderDefinition;
+  value: number;
+}) {
+  const id = `mountains-${slider.key}-control`;
+
+  return (
+    <div className="slider-row">
+      <label htmlFor={id}>{slider.label}</label>
+      <span>{formatControlValue(value, slider.step, slider.unit)}</span>
+      <input
+        id={id}
+        type="range"
+        min={slider.min}
+        max={slider.max}
+        step={slider.step}
+        value={value}
+        data-testid={`mountains-${slider.key}-slider`}
+        onChange={(event) => onChange(slider.key, Number(event.currentTarget.value))}
+      />
+    </div>
+  );
+}
+
+function getLayerLabel(layer: LayerId): string {
+  if (layer === "foreground") {
+    return "Canvas FG";
+  }
+
+  return layer[0].toUpperCase() + layer.slice(1);
+}
+
+function getLayerChipValue(layer: LayerId, controls: PlaygroundControls): string {
+  if (layer === "mountains") {
+    return formatControlValue(controls.mountains.saturation, 0.01);
+  }
+
+  return formatControlValue(controls[layer].opacity, 0.01);
 }
 
 function formatControlValue(value: number, step: number, unit = ""): string {
@@ -631,12 +770,16 @@ function buildDitherConfig(controls: LayerControlValues): DitherConfig | false {
 function buildRevealConfig(controls: LayerControlValues): RevealInteractionConfig {
   return {
     edgeDither: controls.revealEdgeDither,
+    edgeFlicker: controls.revealEdgeFlicker,
     edgeNoise: controls.revealEdgeNoise,
     fadeMs: controls.revealFadeMs,
+    foregroundBlend: BROWSERBASE_REVEAL_FOREGROUND_BLEND,
+    pixelSize: controls.revealPixelSize,
     radius: controls.revealRadius,
     softness: controls.revealSoftness,
     strength: 1,
     trail: {
+      dustFlicker: controls.trailDustFlicker,
       dustSize: controls.trailDustSize,
       durationMs: controls.trailDurationMs,
       idleMs: controls.trailIdleMs,
@@ -645,6 +788,119 @@ function buildRevealConfig(controls: LayerControlValues): RevealInteractionConfi
       strength: controls.trailStrength
     }
   };
+}
+
+function applyMountainColorFilters(source: ImageData, controls: MountainControlValues): ImageData {
+  const output = new ImageData(new Uint8ClampedArray(source.data), source.width, source.height);
+  const hueShift = controls.hue / 360;
+
+  applyMountainPalette(output, controls.colorCount);
+
+  for (let index = 0; index < output.data.length; index += 4) {
+    const alpha = output.data[index + 3] ?? 0;
+
+    if (alpha === 0) {
+      continue;
+    }
+
+    let r = adjustContrast(output.data[index] ?? 0, controls.contrast);
+    let g = adjustContrast(output.data[index + 1] ?? 0, controls.contrast);
+    let b = adjustContrast(output.data[index + 2] ?? 0, controls.contrast);
+
+    r = r * controls.brightness + controls.warmth * 26;
+    g = g * controls.brightness + controls.warmth * 6;
+    b = b * controls.brightness - controls.warmth * 24;
+
+    const hsl = rgbToHsl(r, g, b);
+    const shifted = hslToRgb(
+      moduloFloat(hsl.h + hueShift, 1),
+      clamp01(hsl.s * controls.saturation),
+      hsl.l
+    );
+
+    output.data[index] = clampByte(shifted.r);
+    output.data[index + 1] = clampByte(shifted.g);
+    output.data[index + 2] = clampByte(shifted.b);
+  }
+
+  return output;
+}
+
+function adjustContrast(value: number, contrast: number): number {
+  return (value - 128) * contrast + 128;
+}
+
+type HslColor = {
+  h: number;
+  l: number;
+  s: number;
+};
+
+function rgbToHsl(r: number, g: number, b: number): HslColor {
+  const red = clamp01(r / 255);
+  const green = clamp01(g / 255);
+  const blue = clamp01(b / 255);
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const l = (max + min) / 2;
+
+  if (max === min) {
+    return { h: 0, l, s: 0 };
+  }
+
+  const delta = max - min;
+  const s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+  const h =
+    max === red
+      ? (green - blue) / delta + (green < blue ? 6 : 0)
+      : max === green
+        ? (blue - red) / delta + 2
+        : (red - green) / delta + 4;
+
+  return { h: h / 6, l, s };
+}
+
+function hslToRgb(h: number, s: number, l: number): RgbColor {
+  if (s === 0) {
+    const value = l * 255;
+
+    return { b: value, g: value, r: value };
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  return {
+    b: hueToRgb(p, q, h - 1 / 3) * 255,
+    g: hueToRgb(p, q, h) * 255,
+    r: hueToRgb(p, q, h + 1 / 3) * 255
+  };
+}
+
+function hueToRgb(p: number, q: number, t: number): number {
+  const hue = moduloFloat(t, 1);
+
+  if (hue < 1 / 6) {
+    return p + (q - p) * 6 * hue;
+  }
+
+  if (hue < 1 / 2) {
+    return q;
+  }
+
+  if (hue < 2 / 3) {
+    return p + (q - p) * (2 / 3 - hue) * 6;
+  }
+
+  return p;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function moduloFloat(value: number, divisor: number): number {
+  return ((value % divisor) + divisor) % divisor;
 }
 
 async function loadSkyRevealBackground(width: number, height: number): Promise<ImageData> {
@@ -720,7 +976,6 @@ async function loadMattedMountainForeground(
 
   applyConnectedSkyMatte(imageData);
   pixelateOpaqueForeground(imageData, BROWSERBASE_FOREGROUND_PIXEL_SIZE);
-  applyMountainPalette(imageData);
 
   return imageData;
 }
@@ -920,7 +1175,9 @@ function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-function applyMountainPalette(image: ImageData): void {
+function applyMountainPalette(image: ImageData, colorCount = 5): void {
+  const palette = createMountainPalette(colorCount);
+
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
       const index = (y * image.width + x) * 4;
@@ -937,16 +1194,7 @@ function applyMountainPalette(image: ImageData): void {
       const threshold = (getMountainDitherThreshold(x, y) - 0.5) * 58;
       const shade = luma + threshold;
       const greenBias = g - Math.max(r, b);
-      const color =
-        shade < 70
-          ? MOUNTAIN_PALETTE.black
-          : greenBias > 14 && shade < 190
-            ? MOUNTAIN_PALETTE.green
-            : shade < 128
-              ? MOUNTAIN_PALETTE.orange
-              : shade < 198
-                ? MOUNTAIN_PALETTE.yellow
-                : MOUNTAIN_PALETTE.pale;
+      const color = getMountainPaletteColor(shade, greenBias, palette, colorCount);
 
       image.data[index] = color[0];
       image.data[index + 1] = color[1];
@@ -954,6 +1202,73 @@ function applyMountainPalette(image: ImageData): void {
       image.data[index + 3] = alpha > 80 ? 255 : alpha;
     }
   }
+}
+
+type PaletteColor = readonly [number, number, number];
+
+function createMountainPalette(colorCount: number): PaletteColor[] {
+  const count = Math.max(2, Math.min(12, Math.round(colorCount)));
+  const anchors: PaletteColor[] = [
+    MOUNTAIN_PALETTE.black,
+    MOUNTAIN_PALETTE.orange,
+    MOUNTAIN_PALETTE.yellow,
+    MOUNTAIN_PALETTE.green,
+    MOUNTAIN_PALETTE.pale
+  ];
+
+  if (count === 5) {
+    return [
+      MOUNTAIN_PALETTE.black,
+      MOUNTAIN_PALETTE.orange,
+      MOUNTAIN_PALETTE.yellow,
+      MOUNTAIN_PALETTE.green,
+      MOUNTAIN_PALETTE.pale
+    ];
+  }
+
+  return Array.from({ length: count }, (_, index) => {
+    const position = count === 1 ? 0 : index / (count - 1);
+    const scaled = position * (anchors.length - 1);
+    const leftIndex = Math.min(anchors.length - 2, Math.floor(scaled));
+    const rightIndex = leftIndex + 1;
+    const mix = scaled - leftIndex;
+    const left = anchors[leftIndex];
+    const right = anchors[rightIndex];
+
+    return [
+      Math.round(lerp(left[0], right[0], mix)),
+      Math.round(lerp(left[1], right[1], mix)),
+      Math.round(lerp(left[2], right[2], mix))
+    ] as const;
+  });
+}
+
+function getMountainPaletteColor(
+  shade: number,
+  greenBias: number,
+  palette: PaletteColor[],
+  colorCount: number
+): PaletteColor {
+  if (Math.round(colorCount) === 5) {
+    return shade < 70
+      ? MOUNTAIN_PALETTE.black
+      : greenBias > 14 && shade < 190
+        ? MOUNTAIN_PALETTE.green
+        : shade < 128
+          ? MOUNTAIN_PALETTE.orange
+          : shade < 198
+            ? MOUNTAIN_PALETTE.yellow
+            : MOUNTAIN_PALETTE.pale;
+  }
+
+  const shadeRatio = clamp01(shade / 235);
+  const index = Math.max(0, Math.min(palette.length - 1, Math.round(shadeRatio * (palette.length - 1))));
+
+  return palette[index] ?? palette[palette.length - 1]!;
+}
+
+function lerp(from: number, to: number, amount: number): number {
+  return from + (to - from) * amount;
 }
 
 function pixelateOpaqueForeground(image: ImageData, blockSize: number): void {

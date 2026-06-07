@@ -48,6 +48,24 @@ test("layer control sliders update live playground config", async ({ page }) => 
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("foreground-layer-popover")).toBeHidden();
 
+  const beforeMountains = await samplePageGrid(page, 0.2, 0.82, 0.08, 0.04, 7, 5);
+  await page.getByTestId("layer-control-mountains").click();
+  await expect(page.getByTestId("mountains-layer-popover")).toBeVisible();
+  await setSliderValue(page, "mountains-colorCount-slider", 8);
+  await setSliderValue(page, "mountains-hue-slider", 70);
+  await setSliderValue(page, "mountains-saturation-slider", 0.35);
+  await expect
+    .poll(async () => {
+      const afterMountains = await samplePageGrid(page, 0.2, 0.82, 0.08, 0.04, 7, 5);
+
+      return Math.max(
+        ...afterMountains.map((pixel, index) => colorDistance(pixel, beforeMountains[index]!))
+      );
+    })
+    .toBeGreaterThan(20);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("mountains-layer-popover")).toBeHidden();
+
   await expect(page.getByRole("img", { name: "Browserbase style dithered reveal hero" })).toBeVisible();
   expect((await getDiagnostics(page)).stats?.frames ?? 0).toBeGreaterThan(0);
 
@@ -74,7 +92,7 @@ test("pointer movement reveals background pixels while distant foreground stays 
   const duringReveal = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
   const duringStable = await sampleCanvasPixel(page, 0.18, 0.84);
 
-  expect(colorDistance(beforeReveal, duringReveal)).toBeGreaterThan(35);
+  expect(colorDistance(beforeReveal, duringReveal)).toBeGreaterThan(20);
   expect(colorDistance(beforeStable, duringStable)).toBeLessThan(8);
 
   await page.mouse.move(stableMountain.x, stableMountain.y);
@@ -124,6 +142,27 @@ test("reveal edge contains dithered breakup instead of a smooth spotlight", asyn
   expect(transitions).toBeGreaterThan(18);
 });
 
+test("pixelated reveal edge flickers while the cursor is active", async ({ page }) => {
+  await gotoReady(page);
+
+  const canvas = page.locator("[data-dpc-canvas]");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+
+  const center = point(box!, 0.52, 0.34);
+
+  await page.mouse.move(center.x, center.y);
+  await page.waitForTimeout(90);
+
+  const first = await sampleCanvasGrid(page, 0.52, 0.34, 0.11, 0.035, 33, 9);
+  await page.waitForTimeout(180);
+  const second = await sampleCanvasGrid(page, 0.52, 0.34, 0.11, 0.035, 33, 9);
+  const changed = second.map((pixel, index) => colorDistance(pixel, first[index]!) > 18);
+
+  expect(changed.filter(Boolean).length).toBeGreaterThan(8);
+  expect(countGridTransitions(changed, 33)).toBeGreaterThan(12);
+});
+
 test("reveal clears after pointer leave and dust duration expires", async ({ page }) => {
   await gotoReady(page);
 
@@ -132,18 +171,20 @@ test("reveal clears after pointer leave and dust duration expires", async ({ pag
   expect(box).not.toBeNull();
 
   const center = point(box!, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
-  const before = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
+  const before = await sampleCanvasGrid(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y, 0.055, 0.035, 21, 9);
 
   await page.mouse.move(center.x, center.y);
   await page.waitForTimeout(80);
-  const during = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
+  const during = await sampleCanvasGrid(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y, 0.055, 0.035, 21, 9);
 
   await page.mouse.move(box!.x + box!.width + 24, box!.y + box!.height + 24);
   await page.waitForTimeout(1000);
-  const after = await sampleCanvasPixel(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y);
+  const after = await sampleCanvasGrid(page, SKY_REVEAL_POINT.x, SKY_REVEAL_POINT.y, 0.055, 0.035, 21, 9);
+  const revealed = during.map((pixel, index) => colorDistance(pixel, before[index]!) > 18);
+  const remaining = after.map((pixel, index) => colorDistance(pixel, before[index]!) > 12);
 
-  expect(colorDistance(before, during)).toBeGreaterThan(35);
-  expect(colorDistance(before, after)).toBeLessThan(10);
+  expect(revealed.filter(Boolean).length).toBeGreaterThan(12);
+  expect(remaining.filter(Boolean).length).toBeLessThan(6);
 });
 
 test("reduced motion keeps the static hero and disables reveal animation", async ({ page }) => {

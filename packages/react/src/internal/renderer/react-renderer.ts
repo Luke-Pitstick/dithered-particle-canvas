@@ -356,10 +356,24 @@ class ReactCanvasRenderer implements DitheredCanvasRenderer {
       return false;
     }
 
+    const reveal = this.#getRevealConfig();
+    const pointer = this.#getPointerSnapshot(time);
+    const revealConfig = reveal ? { ...DEFAULT_REVEAL, ...reveal } : undefined;
+
+    if (
+      !this.#motionReduced &&
+      pointer.active &&
+      revealConfig &&
+      revealConfig.edgeDither > 0 &&
+      revealConfig.edgeFlicker > 0
+    ) {
+      return true;
+    }
+
     return this.#pointerStore.isFadeActive({
       now: time,
       reducedMotion: this.#motionReduced,
-      reveal: this.#getRevealConfig()
+      reveal
     });
   }
 

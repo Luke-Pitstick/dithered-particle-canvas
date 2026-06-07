@@ -6,6 +6,7 @@ import { clamp01 } from "../utils/color";
 export const BROWSERBASE_REVEAL_PRESET = DEFAULT_REVEAL;
 
 export const DEFAULT_REVEAL_TRAIL: Required<RevealTrailConfig> = {
+  dustFlicker: 0,
   dustSize: 2,
   durationMs: 900,
   idleMs: 160,
@@ -16,6 +17,10 @@ export const DEFAULT_REVEAL_TRAIL: Required<RevealTrailConfig> = {
 
 const EDGE_NOISE_CELL_SIZE = 18;
 const EDGE_NOISE_MAX_WIDTH_MULTIPLIER = 0.7;
+const DUST_FLICKER_SEED_SCALE = 17.17;
+const DUST_FLICKER_STEP_MS = 80;
+const EDGE_FLICKER_SEED_SCALE = 23.37;
+const EDGE_FLICKER_STEP_MS = 90;
 
 export const REVEAL_DITHER_MATRIX = [
   [0, 8, 2, 10],
@@ -32,6 +37,7 @@ export type RevealMaskSample = {
   y: number;
   pointer: PointerSnapshot;
   reveal?: RevealInteractionConfig | false;
+  time?: number;
 };
 
 export type RevealFadeInput = {
@@ -91,6 +97,7 @@ export function isRevealFadeActive(pointer: PointerSnapshot): boolean {
 export function getRevealMaskAlpha({
   pointer,
   reveal,
+  time,
   x,
   y
 }: RevealMaskSample): number {
@@ -105,7 +112,10 @@ export function getRevealMaskAlpha({
     return 0;
   }
 
-  const distance = Math.hypot(x - pointer.x, y - pointer.y);
+  const pixelSize = getRevealPixelSize(config.pixelSize);
+  const sampleX = getPixelatedSampleCoordinate(x, pixelSize);
+  const sampleY = getPixelatedSampleCoordinate(y, pixelSize);
+  const distance = Math.hypot(sampleX - pointer.x, sampleY - pointer.y);
 
   const softness = clamp01(config.softness);
   const softStart = radius * (1 - softness);
@@ -114,7 +124,8 @@ export function getRevealMaskAlpha({
   const outerRadius =
     edgeNoise > 0 && distance > softStart
       ? radius +
-        (getEdgeNoise(x, y, pointer.x, pointer.y) - 0.5) *
+        (getEdgeNoise(sampleX, sampleY, pointer.x, pointer.y, getEdgeNoiseCellSize(pixelSize)) -
+          0.5) *
           edgeWidth *
           EDGE_NOISE_MAX_WIDTH_MULTIPLIER *
           edgeNoise
@@ -135,8 +146,17 @@ export function getRevealMaskAlpha({
 
   const edgeDither = clamp01(config.edgeDither);
   const edgeAmount = 1 - radialAlpha;
+  const edgeFlicker = clamp01(config.edgeFlicker);
+  const edgeDitherSeed =
+    edgeFlicker > 0
+      ? getEdgeDitherSeed(pointer, pixelSize, time ?? 0, edgeFlicker)
+      : undefined;
 
-  if (edgeDither > 0 && edgeAmount > 0 && getDitherThreshold(x, y) < edgeAmount * edgeDither) {
+  if (
+    edgeDither > 0 &&
+    edgeAmount > 0 &&
+    getDitherThreshold(x, y, pixelSize, edgeDitherSeed) < edgeAmount * edgeDither
+  ) {
     return 0;
   }
 
@@ -153,10 +173,17 @@ export function getRevealCompositeMaskAlpha(sample: RevealMaskSample): number {
   }
 
   let trailAlpha = 0;
+  const dustFlicker = clamp01(trailConfig.dustFlicker);
+  const dustSeedOffset =
+    dustFlicker > 0
+      ? Math.floor(Math.max(0, sample.time ?? 0) / DUST_FLICKER_STEP_MS) *
+        DUST_FLICKER_SEED_SCALE *
+        dustFlicker
+      : 0;
 
   for (const point of sample.pointer.trail ?? []) {
     const fade = clamp01(point.fade);
-    const seed = point.x * 0.37 + point.y * 0.21;
+    const seed = point.x * 0.37 + point.y * 0.21 + dustSeedOffset;
     const dustSize = Math.max(1, trailConfig.dustSize);
 
     if (fade <= 0 || getDustThreshold(sample.x, sample.y, seed, dustSize) > fade) {
@@ -180,9 +207,20 @@ export function getRevealCompositeMaskAlpha(sample: RevealMaskSample): number {
   return Math.max(baseAlpha, trailAlpha);
 }
 
-export function getDitherThreshold(x: number, y: number): number {
-  const row = modulo(Math.floor(y), REVEAL_DITHER_MATRIX.length);
-  const column = modulo(Math.floor(x), REVEAL_DITHER_MATRIX[row].length);
+export function getDitherThreshold(
+  x: number,
+  y: number,
+  pixelSize = 1,
+  seed?: number
+): number {
+  const safePixelSize = getRevealPixelSize(pixelSize);
+
+  if (seed !== undefined) {
+    return getDustThreshold(x, y, seed, safePixelSize);
+  }
+
+  const row = modulo(Math.floor(y / safePixelSize), REVEAL_DITHER_MATRIX.length);
+  const column = modulo(Math.floor(x / safePixelSize), REVEAL_DITHER_MATRIX[row].length);
 
   return (REVEAL_DITHER_MATRIX[row][column] + 0.5) / 16;
 }
@@ -197,12 +235,49 @@ export function getDustThreshold(x: number, y: number, seed = 0, cellSize = 2): 
   return value - Math.floor(value);
 }
 
-export function getEdgeNoise(x: number, y: number, originX: number, originY: number): number {
-  const cellX = Math.floor((x - originX) / EDGE_NOISE_CELL_SIZE);
-  const cellY = Math.floor((y - originY) / EDGE_NOISE_CELL_SIZE);
+export function getEdgeNoise(
+  x: number,
+  y: number,
+  originX: number,
+  originY: number,
+  cellSize = EDGE_NOISE_CELL_SIZE
+): number {
+  const safeCellSize = Math.max(1, cellSize);
+  const cellX = Math.floor((x - originX) / safeCellSize);
+  const cellY = Math.floor((y - originY) / safeCellSize);
   const value = Math.sin(cellX * 127.1 + cellY * 311.7) * 43758.5453123;
 
   return value - Math.floor(value);
+}
+
+function getRevealPixelSize(pixelSize: number | undefined): number {
+  return Math.max(1, Math.round(pixelSize ?? 1));
+}
+
+function getPixelatedSampleCoordinate(value: number, pixelSize: number): number {
+  if (pixelSize <= 1) {
+    return value;
+  }
+
+  return Math.floor(value / pixelSize) * pixelSize + pixelSize / 2;
+}
+
+function getEdgeNoiseCellSize(pixelSize: number): number {
+  return pixelSize > 1 ? pixelSize : EDGE_NOISE_CELL_SIZE;
+}
+
+function getEdgeDitherSeed(
+  pointer: PointerSnapshot,
+  pixelSize: number,
+  time: number,
+  flicker: number
+): number {
+  const pointerSeed =
+    Math.floor(pointer.x / pixelSize) * 0.73 + Math.floor(pointer.y / pixelSize) * 0.41;
+  const timeSeed =
+    Math.floor(Math.max(0, time) / EDGE_FLICKER_STEP_MS) * EDGE_FLICKER_SEED_SCALE;
+
+  return (pointerSeed + timeSeed) * flicker;
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {

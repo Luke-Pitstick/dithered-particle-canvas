@@ -24,6 +24,10 @@ export const REVEAL_COMPOSITE_FRAGMENT_SHADER = `#version 300 es
 precision mediump float;
 
 const int MAX_TRAIL_POINTS = 32;
+const float DUST_FLICKER_SEED_SCALE = 17.17;
+const float DUST_FLICKER_STEP_MS = 80.0;
+const float EDGE_FLICKER_SEED_SCALE = 23.37;
+const float EDGE_FLICKER_STEP_MS = 90.0;
 const float EDGE_NOISE_CELL_SIZE = 18.0;
 const float EDGE_NOISE_MAX_WIDTH_MULTIPLIER = 0.7;
 
@@ -35,10 +39,15 @@ uniform float u_pointerFade;
 uniform float u_radius;
 uniform float u_softness;
 uniform float u_strength;
+uniform float u_time;
 uniform float u_edgeDither;
+uniform float u_edgeFlicker;
 uniform float u_edgeNoise;
+uniform float u_foregroundBlend;
+uniform float u_revealPixelSize;
 uniform int u_revealLayer;
 uniform int u_trailCount;
+uniform float u_trailDustFlicker;
 uniform float u_trailDustSize;
 uniform vec4 u_trailPoints[MAX_TRAIL_POINTS];
 uniform float u_trailStrength;
@@ -46,9 +55,10 @@ uniform float u_trailStrength;
 in vec2 v_uv;
 out vec4 outColor;
 
-float bayer4(vec2 pixel) {
-  int x = int(mod(pixel.x, 4.0));
-  int y = int(mod(pixel.y, 4.0));
+float bayer4(vec2 pixel, float pixelSize) {
+  vec2 cell = floor(pixel / max(1.0, pixelSize));
+  int x = int(mod(cell.x, 4.0));
+  int y = int(mod(cell.y, 4.0));
   int index = y * 4 + x;
   float values[16] = float[16](
     0.0, 8.0, 2.0, 10.0,
@@ -65,8 +75,13 @@ float dustThreshold(vec2 pixel, float seed, float cellSize) {
   return fract(sin(dot(cell, vec2(12.9898, 78.233)) + seed * 0.037719) * 43758.5453);
 }
 
-float edgeNoise(vec2 pixel, vec2 point) {
-  vec2 cell = floor(vec2(pixel.x - point.x, point.y - pixel.y) / EDGE_NOISE_CELL_SIZE);
+float edgeDitherThreshold(vec2 pixel, float pixelSize, float seed) {
+  return seed >= 0.0 ? dustThreshold(pixel, seed, pixelSize) : bayer4(pixel, pixelSize);
+}
+
+float edgeNoise(vec2 pixel, vec2 point, float pixelSize) {
+  float cellSize = pixelSize > 1.0 ? pixelSize : EDGE_NOISE_CELL_SIZE;
+  vec2 cell = floor(vec2(pixel.x - point.x, point.y - pixel.y) / cellSize);
   return fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
@@ -82,14 +97,18 @@ vec4 sourceOver(vec4 destination, vec4 source) {
 }
 
 float revealMask(vec2 pixel, vec2 point, float fade) {
-  float distanceToPointer = distance(pixel, point);
+  float revealPixelSize = max(1.0, u_revealPixelSize);
+  vec2 samplePixel = revealPixelSize <= 1.0
+    ? pixel
+    : floor(pixel / revealPixelSize) * revealPixelSize + revealPixelSize * 0.5;
+  float distanceToPointer = distance(samplePixel, point);
   float softStart = u_radius * (1.0 - clamp(u_softness, 0.0, 1.0));
   float edgeWidth = u_radius - softStart;
   float outerRadius = u_radius;
 
   if (u_edgeNoise > 0.0 && edgeWidth > 0.0 && distanceToPointer > softStart) {
     outerRadius +=
-      (edgeNoise(pixel, point) - 0.5) *
+      (edgeNoise(samplePixel, point, revealPixelSize) - 0.5) *
       edgeWidth *
       EDGE_NOISE_MAX_WIDTH_MULTIPLIER *
       clamp(u_edgeNoise, 0.0, 1.0);
@@ -105,7 +124,15 @@ float revealMask(vec2 pixel, vec2 point, float fade) {
 
   if (mask > 0.0 && u_edgeDither > 0.0) {
     float edgeAmount = 1.0 - mask;
-    mask = bayer4(pixel) < edgeAmount * clamp(u_edgeDither, 0.0, 1.0) ? 0.0 : mask;
+    float edgeFlicker = clamp(u_edgeFlicker, 0.0, 1.0);
+    float edgeSeed = edgeFlicker > 0.0
+      ? (
+        floor(point.x / revealPixelSize) * 0.73 +
+        floor(point.y / revealPixelSize) * 0.41 +
+        floor(max(u_time, 0.0) / EDGE_FLICKER_STEP_MS) * EDGE_FLICKER_SEED_SCALE
+      ) * edgeFlicker
+      : -1.0;
+    mask = edgeDitherThreshold(pixel, revealPixelSize, edgeSeed) < edgeAmount * clamp(u_edgeDither, 0.0, 1.0) ? 0.0 : mask;
   }
 
   return mask * clamp(u_strength, 0.0, 1.0) * clamp(fade, 0.0, 1.0);
@@ -128,6 +155,11 @@ void main() {
     mask = revealMask(pixel, u_pointer, u_pointerFade);
   }
 
+  float dustSeedOffset =
+    floor(max(u_time, 0.0) / DUST_FLICKER_STEP_MS) *
+    DUST_FLICKER_SEED_SCALE *
+    clamp(u_trailDustFlicker, 0.0, 1.0);
+
   for (int i = 0; i < MAX_TRAIL_POINTS; i += 1) {
     if (i >= u_trailCount) {
       break;
@@ -135,12 +167,15 @@ void main() {
 
     vec4 point = u_trailPoints[i];
 
-    if (dustThreshold(pixel, point.w, u_trailDustSize) <= clamp(point.z, 0.0, 1.0)) {
+    if (dustThreshold(pixel, point.w + dustSeedOffset, u_trailDustSize) <= clamp(point.z, 0.0, 1.0)) {
       mask = max(mask, revealMask(pixel, point.xy, u_trailStrength));
     }
   }
 
   vec4 revealSource = u_revealLayer == 0 ? background : foreground;
-  outColor = mix(base, revealSource, mask);
+  float foregroundBlendMask = u_revealLayer == 0
+    ? 1.0 - foreground.a * (1.0 - clamp(u_foregroundBlend, 0.0, 1.0))
+    : 1.0;
+  outColor = mix(base, revealSource, mask * foregroundBlendMask);
 }
 `;

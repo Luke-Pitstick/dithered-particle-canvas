@@ -94,7 +94,8 @@ export class Canvas2DBackend implements RenderBackend {
       foreground,
       pointer,
       revealLayer,
-      reveal
+      reveal,
+      time: frame.time
     });
   }
 
@@ -272,7 +273,8 @@ function mixReveal({
   foreground,
   pointer,
   reveal,
-  revealLayer
+  revealLayer,
+  time
 }: {
   background: ImageData;
   base: ImageData;
@@ -280,24 +282,30 @@ function mixReveal({
   pointer: PointerSnapshot;
   reveal: Exclude<NormalizedLayer["reveal"], false>;
   revealLayer: LayerRole;
+  time: number;
 }): ImageData {
   const output = cloneImageData(base);
   const revealSource = revealLayer === "background" ? background : foreground;
 
   for (let y = 0; y < output.height; y += 1) {
     for (let x = 0; x < output.width; x += 1) {
-      const mask = getRevealCompositeMaskAlpha({ pointer, reveal, x, y });
+      const mask = getRevealCompositeMaskAlpha({ pointer, reveal, time, x, y });
 
       if (mask === 0) {
         continue;
       }
 
       const index = (y * output.width + x) * 4;
+      const foregroundAlpha =
+        revealLayer === "background" ? (foreground.data[index + 3] ?? 0) / 255 : 0;
+      const foregroundBlend =
+        revealLayer === "background" ? clamp01(reveal.foregroundBlend ?? 1) : 1;
+      const effectiveMask = mask * (1 - foregroundAlpha * (1 - foregroundBlend));
 
       for (let channel = 0; channel < 4; channel += 1) {
         output.data[index + channel] = toByte(
-          (base.data[index + channel] ?? 0) * (1 - mask) +
-            (revealSource.data[index + channel] ?? 0) * mask
+          (base.data[index + channel] ?? 0) * (1 - effectiveMask) +
+            (revealSource.data[index + channel] ?? 0) * effectiveMask
         );
       }
     }
