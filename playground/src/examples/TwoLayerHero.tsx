@@ -24,6 +24,8 @@ const BROWSERBASE_TRAIL_DURATION_MS = 720;
 const BROWSERBASE_TRAIL_DUST_FLICKER = 0.72;
 const BROWSERBASE_TRAIL_DUST_SIZE = 6;
 const BROWSERBASE_TRAIL_IDLE_MS = 120;
+const SKY_BACKGROUND_BLUE_BIAS = 42;
+const SKY_BACKGROUND_SATURATION = 1.75;
 const BACKGROUND_REVEAL_SRC = "/background.jpg";
 const FOREGROUND_MOUNTAINS_SRC = "/chautauqua-flatirons_fg.jpg";
 const MOUNTAIN_PALETTE = {
@@ -970,7 +972,32 @@ async function loadSkyRevealBackground(width: number, height: number): Promise<I
 
   context.drawImage(image, 0, 0, width, height);
 
-  return context.getImageData(0, 0, width, height);
+  const imageData = context.getImageData(0, 0, width, height);
+  enhanceSkyBackground(imageData);
+
+  return imageData;
+}
+
+function enhanceSkyBackground(image: ImageData): void {
+  for (let index = 0; index < image.data.length; index += 4) {
+    const alpha = image.data[index + 3] ?? 0;
+
+    if (alpha === 0) {
+      continue;
+    }
+
+    const r = image.data[index] ?? 0;
+    const g = image.data[index + 1] ?? 0;
+    const b = image.data[index + 2] ?? 0;
+    const brightness = (r + g + b) / 3;
+    const skyWeight = clamp01((brightness - 92) / 150);
+    const hsl = rgbToHsl(r, g, b);
+    const saturated = hslToRgb(hsl.h, clamp01(hsl.s * SKY_BACKGROUND_SATURATION), hsl.l);
+
+    image.data[index] = clampByte(saturated.r - SKY_BACKGROUND_BLUE_BIAS * 0.55 * skyWeight);
+    image.data[index + 1] = clampByte(saturated.g + SKY_BACKGROUND_BLUE_BIAS * 0.16 * skyWeight);
+    image.data[index + 2] = clampByte(saturated.b + SKY_BACKGROUND_BLUE_BIAS * skyWeight);
+  }
 }
 
 function createIdleSurfaceImageData(width: number, height: number): ImageData {
